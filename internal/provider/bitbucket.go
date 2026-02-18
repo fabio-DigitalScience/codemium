@@ -16,21 +16,30 @@ const bitbucketAPIBase = "https://api.bitbucket.org"
 
 // Bitbucket implements Provider for Bitbucket Cloud.
 type Bitbucket struct {
-	token   string
-	baseURL string
-	client  *http.Client
+	token    string
+	username string
+	baseURL  string
+	client   *http.Client
+}
+
+// Project represents a Bitbucket project within a workspace.
+type Project struct {
+	Key  string
+	Name string
 }
 
 // NewBitbucket creates a new Bitbucket provider. If baseURL is empty,
-// the default Bitbucket Cloud API endpoint is used.
-func NewBitbucket(token string, baseURL string) *Bitbucket {
+// the default Bitbucket Cloud API endpoint is used. If username is
+// non-empty, Basic Auth is used instead of Bearer token auth.
+func NewBitbucket(token, username, baseURL string) *Bitbucket {
 	if baseURL == "" {
 		baseURL = bitbucketAPIBase
 	}
 	return &Bitbucket{
-		token:   token,
-		baseURL: baseURL,
-		client:  &http.Client{},
+		token:    token,
+		username: username,
+		baseURL:  baseURL,
+		client:   &http.Client{},
 	}
 }
 
@@ -110,14 +119,21 @@ type bitbucketRepo struct {
 	} `json:"parent"`
 }
 
-func (b *Bitbucket) fetchPage(ctx context.Context, pageURL string) ([]model.Repo, string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
+func (b *Bitbucket) doGet(ctx context.Context, url string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+b.token)
+	if b.username != "" {
+		req.SetBasicAuth(b.username, b.token)
+	} else {
+		req.Header.Set("Authorization", "Bearer "+b.token)
+	}
+	return b.client.Do(req)
+}
 
-	resp, err := b.client.Do(req)
+func (b *Bitbucket) fetchPage(ctx context.Context, pageURL string) ([]model.Repo, string, error) {
+	resp, err := b.doGet(ctx, pageURL)
 	if err != nil {
 		return nil, "", fmt.Errorf("bitbucket API request: %w", err)
 	}
@@ -159,6 +175,47 @@ func (b *Bitbucket) fetchPage(ctx context.Context, pageURL string) ([]model.Repo
 	}
 
 	return repos, page.Next, nil
+}
+
+type bitbucketProject struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
+// ListProjects fetches all projects in a Bitbucket workspace, handling
+// pagination automatically.
+func (b *Bitbucket) ListProjects(ctx context.Context, workspace string) ([]Project, error) {
+	var all []Project
+	nextURL := fmt.Sprintf("%s/2.0/workspaces/%s/projects?pagelen=100", b.baseURL, url.PathEscape(workspace))
+
+	for nextURL != "" {
+		resp, err := b.doGet(ctx, nextURL)
+		if err != nil {
+			return nil, fmt.Errorf("bitbucket projects request: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, fmt.Errorf("bitbucket projects API returned status %d", resp.StatusCode)
+		}
+
+		var page struct {
+			Values []bitbucketProject `json:"values"`
+			Next   string             `json:"next"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decode projects response: %w", err)
+		}
+		resp.Body.Close()
+
+		for _, p := range page.Values {
+			all = append(all, Project{Key: p.Key, Name: p.Name})
+		}
+		nextURL = page.Next
+	}
+
+	return all, nil
 }
 
 func contains(slice []string, item string) bool {
