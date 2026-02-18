@@ -1,16 +1,20 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"sort"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/dsablic/codemium/internal/analyzer"
 	"github.com/dsablic/codemium/internal/auth"
@@ -74,12 +78,13 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 	case "bitbucket":
 		clientID := os.Getenv("CODEMIUM_BITBUCKET_CLIENT_ID")
 		clientSecret := os.Getenv("CODEMIUM_BITBUCKET_CLIENT_SECRET")
-		if clientID == "" || clientSecret == "" {
-			return fmt.Errorf("set CODEMIUM_BITBUCKET_CLIENT_ID and CODEMIUM_BITBUCKET_CLIENT_SECRET environment variables")
+		if clientID != "" && clientSecret != "" {
+			bb := &auth.BitbucketOAuth{ClientID: clientID, ClientSecret: clientSecret}
+			fmt.Fprintln(os.Stderr, "Opening browser for Bitbucket authorization...")
+			cred, err = bb.Login(ctx)
+		} else {
+			cred, err = loginBitbucketAPIToken()
 		}
-		bb := &auth.BitbucketOAuth{ClientID: clientID, ClientSecret: clientSecret}
-		fmt.Fprintln(os.Stderr, "Opening browser for Bitbucket authorization...")
-		cred, err = bb.Login(ctx)
 
 	case "github":
 		clientID := os.Getenv("CODEMIUM_GITHUB_CLIENT_ID")
@@ -103,6 +108,61 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(os.Stderr, "Successfully authenticated with %s!\n", providerName)
 	return nil
+}
+
+func loginBitbucketAPIToken() (auth.Credentials, error) {
+	fmt.Fprintln(os.Stderr, "Bitbucket API token login")
+	fmt.Fprintln(os.Stderr, "Create a scoped token at: https://id.atlassian.com/manage-profile/security/api-tokens")
+	fmt.Fprintln(os.Stderr, "  -> 'Create API token with scopes' -> Bitbucket -> Repository Read")
+	fmt.Fprintln(os.Stderr)
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Fprint(os.Stderr, "Email: ")
+	username, err := reader.ReadString('\n')
+	if err != nil {
+		return auth.Credentials{}, fmt.Errorf("read email: %w", err)
+	}
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return auth.Credentials{}, fmt.Errorf("email is required")
+	}
+
+	fmt.Fprint(os.Stderr, "API token: ")
+	tokenBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Fprintln(os.Stderr) // newline after hidden input
+	if err != nil {
+		return auth.Credentials{}, fmt.Errorf("read token: %w", err)
+	}
+	token := strings.TrimSpace(string(tokenBytes))
+	if token == "" {
+		return auth.Credentials{}, fmt.Errorf("API token is required")
+	}
+
+	// Verify credentials by calling the Bitbucket user API
+	req, err := http.NewRequest(http.MethodGet, "https://api.bitbucket.org/2.0/user", nil)
+	if err != nil {
+		return auth.Credentials{}, err
+	}
+	req.SetBasicAuth(username, token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return auth.Credentials{}, fmt.Errorf("verify credentials: %w", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return auth.Credentials{}, fmt.Errorf("invalid email or API token")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return auth.Credentials{}, fmt.Errorf("bitbucket API returned status %d", resp.StatusCode)
+	}
+
+	return auth.Credentials{
+		AccessToken: token,
+		Username:    username,
+	}, nil
 }
 
 func newAnalyzeCmd() *cobra.Command {
@@ -171,7 +231,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		if workspace == "" {
 			return fmt.Errorf("--workspace is required for bitbucket")
 		}
-		prov = provider.NewBitbucket(cred.AccessToken, "")
+		prov = provider.NewBitbucket(cred.AccessToken, cred.Username, "")
 	case "github":
 		if org == "" {
 			return fmt.Errorf("--org is required for github")
@@ -179,6 +239,25 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		prov = provider.NewGitHub(cred.AccessToken, "")
 	default:
 		return fmt.Errorf("unsupported provider: %s", providerName)
+	}
+
+	// Interactive project picker for Bitbucket
+	if providerName == "bitbucket" && len(projects) == 0 && ui.IsTTY() {
+		bb := prov.(*provider.Bitbucket)
+		fmt.Fprintln(os.Stderr, "Fetching projects...")
+		projectList, err := bb.ListProjects(ctx, workspace)
+		if err != nil {
+			return fmt.Errorf("list projects: %w", err)
+		}
+		if len(projectList) > 0 {
+			selected, err := ui.PickProjects(projectList)
+			if err != nil {
+				return fmt.Errorf("project picker: %w", err)
+			}
+			if len(selected) > 0 {
+				projects = selected
+			}
+		}
 	}
 
 	// List repos
@@ -213,7 +292,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	}
 
 	// Process repos
-	cloner := analyzer.NewCloner(cred.AccessToken)
+	cloner := analyzer.NewCloner(cred.AccessToken, cred.Username)
 	codeAnalyzer := analyzer.New()
 
 	progressFn := func(completed, total int, repo model.Repo) {
