@@ -563,6 +563,12 @@ func runTrends(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no repositories found")
 	}
 
+	// Trends requires full git clone for history — Bitbucket API tokens
+	// only support tarball downloads, not git operations.
+	if providerName == "bitbucket" && cred.Username != "" {
+		return fmt.Errorf("trends requires OAuth credentials for Bitbucket (API tokens cannot clone git history)\nSet CODEMIUM_BITBUCKET_CLIENT_ID and CODEMIUM_BITBUCKET_CLIENT_SECRET, then run: codemium auth login --provider bitbucket")
+	}
+
 	dates := history.GenerateDates(since, until, interval)
 	if len(dates) == 0 {
 		return fmt.Errorf("no periods generated for --since %s --until %s --interval %s", since, until, interval)
