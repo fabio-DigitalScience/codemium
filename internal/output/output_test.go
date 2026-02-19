@@ -65,6 +65,82 @@ func TestWriteJSON(t *testing.T) {
 	}
 }
 
+func sampleTrendsReport() model.TrendsReport {
+	return model.TrendsReport{
+		GeneratedAt:  "2026-02-19T12:00:00Z",
+		Provider:     "github",
+		Organization: "myorg",
+		Since:        "2025-01",
+		Until:        "2025-03",
+		Interval:     "monthly",
+		Periods:      []string{"2025-01", "2025-02", "2025-03"},
+		Snapshots: []model.PeriodSnapshot{
+			{
+				Period: "2025-01",
+				Repositories: []model.RepoStats{
+					{Repository: "api", Provider: "github", Totals: model.Stats{Code: 1000, Files: 10}},
+				},
+				Totals:     model.Stats{Repos: 1, Code: 1000, Files: 10},
+				ByLanguage: []model.LanguageStats{{Name: "Go", Code: 1000}},
+			},
+			{
+				Period: "2025-02",
+				Repositories: []model.RepoStats{
+					{Repository: "api", Provider: "github", Totals: model.Stats{Code: 1200, Files: 12}},
+				},
+				Totals:     model.Stats{Repos: 1, Code: 1200, Files: 12},
+				ByLanguage: []model.LanguageStats{{Name: "Go", Code: 1200}},
+			},
+			{
+				Period: "2025-03",
+				Repositories: []model.RepoStats{
+					{Repository: "api", Provider: "github", Totals: model.Stats{Code: 1500, Files: 15}},
+				},
+				Totals:     model.Stats{Repos: 1, Code: 1500, Files: 15},
+				ByLanguage: []model.LanguageStats{{Name: "Go", Code: 1500}},
+			},
+		},
+	}
+}
+
+func TestWriteTrendsJSON(t *testing.T) {
+	report := sampleTrendsReport()
+	var buf bytes.Buffer
+	if err := output.WriteTrendsJSON(&buf, report); err != nil {
+		t.Fatalf("failed to write trends JSON: %v", err)
+	}
+
+	var decoded model.TrendsReport
+	if err := json.Unmarshal(buf.Bytes(), &decoded); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+	if len(decoded.Snapshots) != 3 {
+		t.Errorf("expected 3 snapshots, got %d", len(decoded.Snapshots))
+	}
+}
+
+func TestWriteTrendsMarkdown(t *testing.T) {
+	report := sampleTrendsReport()
+	var buf bytes.Buffer
+	if err := output.WriteTrendsMarkdown(&buf, report); err != nil {
+		t.Fatalf("failed to write trends markdown: %v", err)
+	}
+
+	md := buf.String()
+	if !strings.Contains(md, "2025-01") {
+		t.Error("markdown should contain period 2025-01")
+	}
+	if !strings.Contains(md, "2025-03") {
+		t.Error("markdown should contain period 2025-03")
+	}
+	if !strings.Contains(md, "api") {
+		t.Error("markdown should contain repo name")
+	}
+	if !strings.Contains(md, "+") {
+		t.Error("markdown should contain delta indicators")
+	}
+}
+
 func TestWriteMarkdown(t *testing.T) {
 	report := sampleReport()
 	var buf bytes.Buffer

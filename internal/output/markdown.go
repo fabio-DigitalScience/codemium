@@ -4,6 +4,7 @@ package output
 import (
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/dsablic/codemium/internal/model"
 )
@@ -53,6 +54,134 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 	fmt.Fprintln(w)
 
 	// Errors
+	if len(report.Errors) > 0 {
+		fmt.Fprintf(w, "## Errors\n\n")
+		for _, e := range report.Errors {
+			fmt.Fprintf(w, "- **%s**: %s\n", e.Repository, e.Error)
+		}
+		fmt.Fprintln(w)
+	}
+
+	return nil
+}
+
+// WriteTrendsMarkdown writes the trends report as GitHub-flavored markdown to w.
+func WriteTrendsMarkdown(w io.Writer, report model.TrendsReport) error {
+	fmt.Fprintf(w, "# Code Trends Report\n\n")
+	fmt.Fprintf(w, "**Provider:** %s\n", report.Provider)
+	if report.Workspace != "" {
+		fmt.Fprintf(w, "**Workspace:** %s\n", report.Workspace)
+	}
+	if report.Organization != "" {
+		fmt.Fprintf(w, "**Organization:** %s\n", report.Organization)
+	}
+	fmt.Fprintf(w, "**Period:** %s to %s (%s)\n", report.Since, report.Until, report.Interval)
+	fmt.Fprintf(w, "**Generated:** %s\n\n", report.GeneratedAt)
+
+	// Summary table: one row per period
+	fmt.Fprintf(w, "## Summary\n\n")
+	fmt.Fprintf(w, "| Period | Files | Code | Comments | Blanks | Complexity | Code Delta |\n")
+	fmt.Fprintf(w, "|--------|------:|-----:|---------:|-------:|-----------:|-----------:|\n")
+	var prevCode int64
+	for _, snap := range report.Snapshots {
+		delta := ""
+		if prevCode > 0 {
+			diff := snap.Totals.Code - prevCode
+			if diff >= 0 {
+				delta = fmt.Sprintf("+%d", diff)
+			} else {
+				delta = fmt.Sprintf("%d", diff)
+			}
+		}
+		fmt.Fprintf(w, "| %s | %d | %d | %d | %d | %d | %s |\n",
+			snap.Period, snap.Totals.Files, snap.Totals.Code,
+			snap.Totals.Comments, snap.Totals.Blanks, snap.Totals.Complexity, delta)
+		prevCode = snap.Totals.Code
+	}
+	fmt.Fprintln(w)
+
+	// Language breakdown across time
+	fmt.Fprintf(w, "## Languages Over Time\n\n")
+	fmt.Fprintf(w, "| Language |")
+	for _, p := range report.Periods {
+		fmt.Fprintf(w, " %s |", p)
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "|----------|")
+	for range report.Periods {
+		fmt.Fprintf(w, "-----:|")
+	}
+	fmt.Fprintln(w)
+
+	langSet := map[string]bool{}
+	for _, snap := range report.Snapshots {
+		for _, lang := range snap.ByLanguage {
+			langSet[lang.Name] = true
+		}
+	}
+	var langNames []string
+	for name := range langSet {
+		langNames = append(langNames, name)
+	}
+	sort.Strings(langNames)
+
+	for _, name := range langNames {
+		fmt.Fprintf(w, "| %s |", name)
+		for _, snap := range report.Snapshots {
+			code := int64(0)
+			for _, lang := range snap.ByLanguage {
+				if lang.Name == name {
+					code = lang.Code
+					break
+				}
+			}
+			fmt.Fprintf(w, " %d |", code)
+		}
+		fmt.Fprintln(w)
+	}
+	fmt.Fprintln(w)
+
+	// Per-repo code over time
+	fmt.Fprintf(w, "## Repositories Over Time\n\n")
+	fmt.Fprintf(w, "| Repository |")
+	for _, p := range report.Periods {
+		fmt.Fprintf(w, " %s |", p)
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "|------------|")
+	for range report.Periods {
+		fmt.Fprintf(w, "-----:|")
+	}
+	fmt.Fprintln(w)
+
+	repoSet := map[string]bool{}
+	for _, snap := range report.Snapshots {
+		for _, repo := range snap.Repositories {
+			repoSet[repo.Repository] = true
+		}
+	}
+	var repoNames []string
+	for name := range repoSet {
+		repoNames = append(repoNames, name)
+	}
+	sort.Strings(repoNames)
+
+	for _, name := range repoNames {
+		fmt.Fprintf(w, "| %s |", name)
+		for _, snap := range report.Snapshots {
+			code := int64(0)
+			for _, repo := range snap.Repositories {
+				if repo.Repository == name {
+					code = repo.Totals.Code
+					break
+				}
+			}
+			fmt.Fprintf(w, " %d |", code)
+		}
+		fmt.Fprintln(w)
+	}
+	fmt.Fprintln(w)
+
 	if len(report.Errors) > 0 {
 		fmt.Fprintf(w, "## Errors\n\n")
 		for _, e := range report.Errors {

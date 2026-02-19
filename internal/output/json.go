@@ -14,3 +14,10 @@ func WriteJSON(w io.Writer, report model.Report) error {
 	enc.SetIndent("", "  ")
 	return enc.Encode(report)
 }
+
+// WriteTrendsJSON writes the trends report as pretty-printed JSON to w.
+func WriteTrendsJSON(w io.Writer, report model.TrendsReport) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(report)
+}
