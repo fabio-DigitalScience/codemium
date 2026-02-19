@@ -124,6 +124,20 @@ codemium analyze --provider github --org myorg
 codemium analyze --provider github --org myorg --repos api,frontend
 ```
 
+### Analyze trends over time
+
+```bash
+# Monthly trends for the past year
+codemium trends --provider github --org myorg --since 2025-03 --until 2026-02
+
+# Weekly trends
+codemium trends --provider github --org myorg --since 2025-01-01 --until 2025-03-01 --interval weekly
+
+# Output to file, then convert to markdown
+codemium trends --provider github --org myorg --since 2025-01 --until 2025-12 --output trends.json
+codemium markdown trends.json > trends.md
+```
+
 ### Output options
 
 ```bash

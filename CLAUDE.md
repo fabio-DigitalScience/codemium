@@ -29,9 +29,11 @@ internal/
     github.go          GitHub REST API
   analyzer/
     analyzer.go        Code analysis using scc as a Go library
-    clone.go           Shallow cloning via go-git with token auth
+    clone.go           Shallow/full cloning via go-git with token auth + checkout
+  history/
+    history.go         Date generation and git commit resolution for trends
   worker/
-    pool.go            Bounded goroutine pool with progress callbacks
+    pool.go            Bounded goroutine pool with progress callbacks (analyze + trends)
   ui/
     progress.go        Bubbletea progress bar (TTY) / plain text fallback
   output/
