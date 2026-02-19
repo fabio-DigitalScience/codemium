@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
@@ -69,6 +70,63 @@ func (c *Cloner) Clone(ctx context.Context, cloneURL string) (dir string, cleanu
 	}
 
 	return tmpDir, cleanupFn, nil
+}
+
+// CloneFull clones the repository at cloneURL with full history into a
+// temporary directory. It returns the go-git Repository handle, the directory
+// path, a cleanup function, and any error.
+func (c *Cloner) CloneFull(ctx context.Context, cloneURL string) (repo *git.Repository, dir string, cleanup func(), err error) {
+	tmpDir, err := os.MkdirTemp("", "codemium-*")
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("create temp dir: %w", err)
+	}
+
+	cleanupFn := func() {
+		os.RemoveAll(tmpDir)
+	}
+
+	opts := &git.CloneOptions{
+		URL:  cloneURL,
+		Tags: git.NoTags,
+	}
+
+	if c.token != "" {
+		username := c.username
+		if username == "" {
+			username = "x-token-auth"
+		}
+		opts.Auth = &githttp.BasicAuth{
+			Username: username,
+			Password: c.token,
+		}
+	}
+
+	r, err := git.PlainCloneContext(ctx, tmpDir, false, opts)
+	if err != nil {
+		cleanupFn()
+		return nil, "", nil, fmt.Errorf("git clone: %w", err)
+	}
+
+	return r, tmpDir, cleanupFn, nil
+}
+
+// Checkout checks out the given commit hash in the repository worktree,
+// forcefully replacing any existing working tree contents.
+func Checkout(repo *git.Repository, dir string, hash plumbing.Hash) error {
+	wt, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("get worktree: %w", err)
+	}
+
+	err = wt.Checkout(&git.CheckoutOptions{
+		Hash:  hash,
+		Force: true,
+	})
+	if err != nil {
+		return fmt.Errorf("checkout %s: %w", hash, err)
+	}
+
+	return nil
 }
 
 // Download fetches a tarball from downloadURL, extracts it to a temporary
