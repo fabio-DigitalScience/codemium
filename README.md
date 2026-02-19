@@ -158,6 +158,29 @@ codemium analyze --provider github --org myorg --markdown report.md
 codemium analyze --provider github --org myorg --output report.json --markdown report.md
 ```
 
+### AI narrative analysis
+
+Generate a rich narrative analysis of your codebase using an AI CLI:
+
+```bash
+# Auto-detect AI CLI (tries claude, codex, gemini in order)
+codemium markdown --narrative report.json
+
+# Use a specific AI CLI
+codemium markdown --narrative --ai-cli gemini report.json
+
+# Add custom instructions
+codemium markdown --narrative --ai-prompt "Focus on test coverage gaps" report.json
+
+# Load instructions from file
+codemium markdown --narrative --ai-prompt-file analysis-prompt.txt report.json
+
+# Works with trends reports too
+codemium markdown --narrative trends.json
+```
+
+Requires one of: [Claude Code](https://claude.com/claude-code), [Codex CLI](https://github.com/openai/codex), or [Gemini CLI](https://github.com/google-gemini/gemini-cli) installed and authenticated.
+
 ### Additional flags
 
 ```bash

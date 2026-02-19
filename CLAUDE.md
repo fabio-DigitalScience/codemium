@@ -32,6 +32,8 @@ internal/
     clone.go           Shallow/full cloning via go-git with token auth + checkout
   history/
     history.go         Date generation and git commit resolution for trends
+  narrative/
+    narrative.go       AI CLI detection, prompt building, execution for narrative reports
   worker/
     pool.go            Bounded goroutine pool with progress callbacks (analyze + trends)
   ui/
