@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -190,7 +191,7 @@ func newAnalyzeCmd() *cobra.Command {
 	cmd.Flags().Bool("include-archived", false, "Include archived repos")
 	cmd.Flags().Bool("include-forks", false, "Include forked repos")
 	cmd.Flags().Int("concurrency", 5, "Number of parallel workers")
-	cmd.Flags().String("output", "", "Write JSON to file (default: stdout)")
+	cmd.Flags().String("output", "output/report.json", "Write JSON to file")
 
 	cmd.MarkFlagRequired("provider")
 
@@ -353,6 +354,9 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	// Write JSON output
 	var jsonWriter io.Writer = os.Stdout
 	if outputPath != "" {
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+			return fmt.Errorf("create output directory: %w", err)
+		}
 		f, err := os.Create(outputPath)
 		if err != nil {
 			return fmt.Errorf("create output file: %w", err)
@@ -362,6 +366,10 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	}
 	if err := output.WriteJSON(jsonWriter, report); err != nil {
 		return fmt.Errorf("write JSON: %w", err)
+	}
+
+	if outputPath != "" {
+		fmt.Fprintf(os.Stderr, "Report written to %s\n", outputPath)
 	}
 
 	return nil
@@ -534,7 +542,7 @@ func newTrendsCmd() *cobra.Command {
 	cmd.Flags().Bool("include-archived", false, "Include archived repos")
 	cmd.Flags().Bool("include-forks", false, "Include forked repos")
 	cmd.Flags().Int("concurrency", 5, "Number of parallel workers")
-	cmd.Flags().String("output", "", "Write JSON to file (default: stdout)")
+	cmd.Flags().String("output", "output/report.json", "Write JSON to file")
 
 	cmd.MarkFlagRequired("provider")
 	cmd.MarkFlagRequired("since")
@@ -701,6 +709,9 @@ func runTrends(cmd *cobra.Command, args []string) error {
 
 	var jsonWriter io.Writer = os.Stdout
 	if outputPath != "" {
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+			return fmt.Errorf("create output directory: %w", err)
+		}
 		f, err := os.Create(outputPath)
 		if err != nil {
 			return fmt.Errorf("create output file: %w", err)
@@ -709,7 +720,15 @@ func runTrends(cmd *cobra.Command, args []string) error {
 		jsonWriter = f
 	}
 
-	return output.WriteTrendsJSON(jsonWriter, report)
+	if err := output.WriteTrendsJSON(jsonWriter, report); err != nil {
+		return err
+	}
+
+	if outputPath != "" {
+		fmt.Fprintf(os.Stderr, "Report written to %s\n", outputPath)
+	}
+
+	return nil
 }
 
 func buildTrendsReport(providerName, workspace, org, since, until, interval string, periods, repos, exclude []string, results []worker.TrendsResult) model.TrendsReport {
