@@ -38,6 +38,10 @@ internal/
     pool.go            Bounded goroutine pool with progress callbacks (analyze + trends)
   ui/
     progress.go        Bubbletea progress bar (TTY) / plain text fallback
+  aidetect/
+    detect.go           AI signal detection (co-author, message patterns, bot authors)
+  aiestimate/
+    estimate.go         AI estimation orchestrator (per-repo commit scanning)
   output/
     json.go            JSON report writer
     markdown.go        Markdown report writer
@@ -58,6 +62,7 @@ internal/
 - **Auth**: Credentials stored at `~/.config/codemium/credentials.json` (0600 perms). Resolution order: env vars (`CODEMIUM_<PROVIDER>_TOKEN`) → saved credentials → `gh auth token` CLI (GitHub only).
 - **Clone strategy**: Shallow clone (depth 1, single branch, no tags) to temp dir, deleted after analysis.
 - **scc initialization**: `processor.ProcessConstants()` called via `sync.Once` since scc requires global initialization.
+- **AI estimation**: When `--ai-estimate` is used, a second pass fetches commit history via provider REST APIs. `provider.CommitLister` interface provides `ListCommits` and `CommitStats`. `aidetect.Detect` classifies commits, `aiestimate.Estimate` orchestrates per-repo. Results attach to existing report model as optional fields.
 
 ## Conventions
 

@@ -15,6 +15,7 @@ Generate code statistics across all repositories in a Bitbucket Cloud workspace,
 - JSON output to file (default: `output/report.json`) and optional markdown summary
 - Parallel processing with configurable concurrency
 - Progress bar in terminal, plain text fallback in CI/CD
+- AI code estimation: detect AI-assisted commits via co-author tags, message patterns, and bot authors
 - Pure Go, no external dependencies at runtime (no git or scc binary needed)
 
 ## Installation
@@ -217,6 +218,8 @@ This is especially useful when Bitbucket project codes or repo naming convention
 --concurrency 10       # Parallel workers (default: 5)
 --include-archived     # Include archived repos (excluded by default)
 --include-forks        # Include forked repos (excluded by default)
+--ai-estimate          # Estimate AI-generated code via commit history analysis
+--ai-commit-limit 200  # Max commits to scan per repo (default: 200)
 ```
 
 ## Output Format
