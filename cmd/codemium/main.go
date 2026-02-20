@@ -184,6 +184,7 @@ func newAnalyzeCmd() *cobra.Command {
 	cmd.Flags().String("provider", "", "Provider (bitbucket, github)")
 	cmd.Flags().String("workspace", "", "Bitbucket workspace slug")
 	cmd.Flags().String("org", "", "GitHub organization")
+	cmd.Flags().String("user", "", "GitHub user (alternative to --org for personal repos)")
 	cmd.Flags().StringSlice("projects", nil, "Filter by Bitbucket project keys")
 	cmd.Flags().StringSlice("repos", nil, "Filter to specific repo names")
 	cmd.Flags().StringSlice("exclude", nil, "Exclude specific repos")
@@ -204,6 +205,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	providerName, _ := cmd.Flags().GetString("provider")
 	workspace, _ := cmd.Flags().GetString("workspace")
 	org, _ := cmd.Flags().GetString("org")
+	user, _ := cmd.Flags().GetString("user")
 	projects, _ := cmd.Flags().GetStringSlice("projects")
 	repos, _ := cmd.Flags().GetStringSlice("repos")
 	exclude, _ := cmd.Flags().GetStringSlice("exclude")
@@ -240,8 +242,11 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		}
 		prov = provider.NewBitbucket(cred.AccessToken, cred.Username, "")
 	case "github":
-		if org == "" {
-			return fmt.Errorf("--org is required for github")
+		if org != "" && user != "" {
+			return fmt.Errorf("--org and --user are mutually exclusive for github")
+		}
+		if org == "" && user == "" {
+			return fmt.Errorf("--org or --user is required for github")
 		}
 		prov = provider.NewGitHub(cred.AccessToken, "")
 	default:
@@ -272,6 +277,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	repoList, err := prov.ListRepos(ctx, provider.ListOpts{
 		Workspace:       workspace,
 		Organization:    org,
+		User:            user,
 		Projects:        projects,
 		Repos:           repos,
 		Exclude:         exclude,
@@ -347,8 +353,12 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		program.Quit()
 	}
 
-	// Build report
-	report := buildReport(providerName, workspace, org, projects, repos, exclude, results)
+	// Build report — use user as organization in metadata when --user is set
+	reportOrg := org
+	if user != "" {
+		reportOrg = user
+	}
+	report := buildReport(providerName, workspace, reportOrg, projects, repos, exclude, results)
 
 	// Write JSON output
 	var jsonWriter io.Writer = os.Stdout
@@ -526,6 +536,7 @@ func newTrendsCmd() *cobra.Command {
 	cmd.Flags().String("provider", "", "Provider (bitbucket, github)")
 	cmd.Flags().String("workspace", "", "Bitbucket workspace slug")
 	cmd.Flags().String("org", "", "GitHub organization")
+	cmd.Flags().String("user", "", "GitHub user (alternative to --org for personal repos)")
 	cmd.Flags().String("since", "", "Start period (YYYY-MM for monthly, YYYY-MM-DD for weekly)")
 	cmd.Flags().String("until", "", "End period (YYYY-MM for monthly, YYYY-MM-DD for weekly)")
 	cmd.Flags().String("interval", "monthly", "Interval: monthly or weekly")
@@ -550,6 +561,7 @@ func runTrends(cmd *cobra.Command, args []string) error {
 	providerName, _ := cmd.Flags().GetString("provider")
 	workspace, _ := cmd.Flags().GetString("workspace")
 	org, _ := cmd.Flags().GetString("org")
+	user, _ := cmd.Flags().GetString("user")
 	since, _ := cmd.Flags().GetString("since")
 	until, _ := cmd.Flags().GetString("until")
 	interval, _ := cmd.Flags().GetString("interval")
@@ -589,8 +601,11 @@ func runTrends(cmd *cobra.Command, args []string) error {
 		}
 		prov = provider.NewBitbucket(cred.AccessToken, cred.Username, "")
 	case "github":
-		if org == "" {
-			return fmt.Errorf("--org is required for github")
+		if org != "" && user != "" {
+			return fmt.Errorf("--org and --user are mutually exclusive for github")
+		}
+		if org == "" && user == "" {
+			return fmt.Errorf("--org or --user is required for github")
 		}
 		prov = provider.NewGitHub(cred.AccessToken, "")
 	default:
@@ -601,6 +616,7 @@ func runTrends(cmd *cobra.Command, args []string) error {
 	repoList, err := prov.ListRepos(ctx, provider.ListOpts{
 		Workspace:       workspace,
 		Organization:    org,
+		User:            user,
 		Repos:           repos,
 		Exclude:         exclude,
 		IncludeArchived: includeArchived,
@@ -697,7 +713,11 @@ func runTrends(cmd *cobra.Command, args []string) error {
 		program.Quit()
 	}
 
-	report := buildTrendsReport(providerName, workspace, org, since, until, interval, periods, repos, exclude, results)
+	reportOrg := org
+	if user != "" {
+		reportOrg = user
+	}
+	report := buildTrendsReport(providerName, workspace, reportOrg, since, until, interval, periods, repos, exclude, results)
 
 	var jsonWriter io.Writer = os.Stdout
 	if outputPath != "" {
