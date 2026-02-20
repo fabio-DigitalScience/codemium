@@ -33,6 +33,19 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 	fmt.Fprintf(w, "| Blanks | %d |\n", report.Totals.Blanks)
 	fmt.Fprintf(w, "| Complexity | %d |\n\n", report.Totals.Complexity)
 
+	// AI Code Estimation (only if present)
+	if report.AIEstimate != nil {
+		fmt.Fprintf(w, "## AI Code Estimation\n\n")
+		fmt.Fprintf(w, "| Metric | Total | AI-Attributed | Percentage |\n")
+		fmt.Fprintf(w, "|--------|------:|:-------------:|-----------:|\n")
+		fmt.Fprintf(w, "| Commits | %d | %d | %.1f%% |\n",
+			report.AIEstimate.TotalCommits, report.AIEstimate.AICommits, report.AIEstimate.CommitPercent)
+		if report.AIEstimate.AIAdditions > 0 {
+			fmt.Fprintf(w, "| Line additions | — | %d | — |\n", report.AIEstimate.AIAdditions)
+		}
+		fmt.Fprintln(w)
+	}
+
 	// By language
 	fmt.Fprintf(w, "## Languages\n\n")
 	fmt.Fprintf(w, "| Language | Files | Code | Comments | Blanks | Complexity |\n")
@@ -44,12 +57,31 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 	fmt.Fprintln(w)
 
 	// Per repository
+	hasAI := report.AIEstimate != nil
 	fmt.Fprintf(w, "## Repositories\n\n")
-	fmt.Fprintf(w, "| Repository | Project | Files | Code | Comments | Complexity |\n")
-	fmt.Fprintf(w, "|------------|---------|------:|-----:|---------:|-----------:|\n")
+	if hasAI {
+		fmt.Fprintf(w, "| Repository | Project | Files | Code | Comments | Complexity | AI Commits %% | AI Additions |\n")
+		fmt.Fprintf(w, "|------------|---------|------:|-----:|---------:|-----------:|-------------:|-------------:|\n")
+	} else {
+		fmt.Fprintf(w, "| Repository | Project | Files | Code | Comments | Complexity |\n")
+		fmt.Fprintf(w, "|------------|---------|------:|-----:|---------:|-----------:|\n")
+	}
 	for _, repo := range report.Repositories {
-		fmt.Fprintf(w, "| [%s](%s) | %s | %d | %d | %d | %d |\n",
-			repo.Repository, repo.URL, repo.Project, repo.Totals.Files, repo.Totals.Code, repo.Totals.Comments, repo.Totals.Complexity)
+		if hasAI {
+			aiPct := "—"
+			aiAdd := "—"
+			if repo.AIEstimate != nil {
+				aiPct = fmt.Sprintf("%.1f%%", repo.AIEstimate.CommitPercent)
+				aiAdd = fmt.Sprintf("%d", repo.AIEstimate.AIAdditions)
+			}
+			fmt.Fprintf(w, "| [%s](%s) | %s | %d | %d | %d | %d | %s | %s |\n",
+				repo.Repository, repo.URL, repo.Project, repo.Totals.Files, repo.Totals.Code,
+				repo.Totals.Comments, repo.Totals.Complexity, aiPct, aiAdd)
+		} else {
+			fmt.Fprintf(w, "| [%s](%s) | %s | %d | %d | %d | %d |\n",
+				repo.Repository, repo.URL, repo.Project, repo.Totals.Files, repo.Totals.Code,
+				repo.Totals.Comments, repo.Totals.Complexity)
+		}
 	}
 	fmt.Fprintln(w)
 

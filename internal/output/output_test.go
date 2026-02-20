@@ -159,3 +159,58 @@ func TestWriteMarkdown(t *testing.T) {
 		t.Error("markdown should contain table pipes")
 	}
 }
+
+func TestWriteMarkdownWithAIEstimate(t *testing.T) {
+	report := sampleReport()
+	report.AIEstimate = &model.AIEstimate{
+		TotalCommits:  200,
+		AICommits:     50,
+		CommitPercent: 25.0,
+		AIAdditions:   3000,
+	}
+	report.Repositories[0].AIEstimate = &model.AIEstimate{
+		TotalCommits:  100,
+		AICommits:     30,
+		CommitPercent: 30.0,
+		AIAdditions:   2000,
+	}
+	report.Repositories[1].AIEstimate = &model.AIEstimate{
+		TotalCommits:  100,
+		AICommits:     20,
+		CommitPercent: 20.0,
+		AIAdditions:   1000,
+	}
+
+	var buf bytes.Buffer
+	if err := output.WriteMarkdown(&buf, report); err != nil {
+		t.Fatalf("WriteMarkdown: %v", err)
+	}
+
+	md := buf.String()
+	if !strings.Contains(md, "AI Code Estimation") {
+		t.Error("markdown should contain AI Code Estimation section")
+	}
+	if !strings.Contains(md, "25.0%") {
+		t.Error("markdown should contain aggregate commit percentage")
+	}
+	if !strings.Contains(md, "AI Commits %") {
+		t.Error("markdown should contain AI Commits % column in repo table")
+	}
+}
+
+func TestWriteMarkdownWithoutAIEstimate(t *testing.T) {
+	report := sampleReport()
+
+	var buf bytes.Buffer
+	if err := output.WriteMarkdown(&buf, report); err != nil {
+		t.Fatalf("WriteMarkdown: %v", err)
+	}
+
+	md := buf.String()
+	if strings.Contains(md, "AI Code Estimation") {
+		t.Error("markdown should NOT contain AI Code Estimation when not present")
+	}
+	if strings.Contains(md, "AI Commits %") {
+		t.Error("markdown should NOT contain AI columns when not present")
+	}
+}
