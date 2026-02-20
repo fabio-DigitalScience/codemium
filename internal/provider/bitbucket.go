@@ -235,6 +235,112 @@ func (b *Bitbucket) ListProjects(ctx context.Context, workspace string) ([]Proje
 	return all, nil
 }
 
+func workspaceSlug(repoURL string) (string, string) {
+	parts := strings.Split(strings.TrimRight(repoURL, "/"), "/")
+	if len(parts) < 2 {
+		return "", ""
+	}
+	return parts[len(parts)-2], parts[len(parts)-1]
+}
+
+type bitbucketCommit struct {
+	Hash    string `json:"hash"`
+	Message string `json:"message"`
+	Author  struct {
+		Raw string `json:"raw"`
+	} `json:"author"`
+}
+
+// ListCommits fetches up to limit commits for a repo via the Bitbucket API.
+func (b *Bitbucket) ListCommits(ctx context.Context, repo model.Repo, limit int) ([]CommitInfo, error) {
+	ws, slug := workspaceSlug(repo.URL)
+	if ws == "" {
+		return nil, fmt.Errorf("cannot parse workspace/slug from URL: %s", repo.URL)
+	}
+
+	var all []CommitInfo
+	nextURL := fmt.Sprintf("%s/2.0/repositories/%s/%s/commits?pagelen=100",
+		b.baseURL, url.PathEscape(ws), url.PathEscape(slug))
+
+	for nextURL != "" {
+		resp, err := b.doGet(ctx, nextURL)
+		if err != nil {
+			return nil, fmt.Errorf("bitbucket commits API: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, fmt.Errorf("bitbucket commits API returned status %d", resp.StatusCode)
+		}
+
+		var page struct {
+			Values []bitbucketCommit `json:"values"`
+			Next   string            `json:"next"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decode bitbucket commits: %w", err)
+		}
+		resp.Body.Close()
+
+		for _, c := range page.Values {
+			all = append(all, CommitInfo{
+				Hash:    c.Hash,
+				Author:  c.Author.Raw,
+				Message: c.Message,
+			})
+			if limit > 0 && len(all) >= limit {
+				return all, nil
+			}
+		}
+
+		nextURL = page.Next
+	}
+
+	return all, nil
+}
+
+type bitbucketDiffStat struct {
+	LinesAdded   int64 `json:"lines_added"`
+	LinesRemoved int64 `json:"lines_removed"`
+}
+
+// CommitStats fetches addition/deletion counts for a single Bitbucket commit.
+func (b *Bitbucket) CommitStats(ctx context.Context, repo model.Repo, hash string) (int64, int64, error) {
+	ws, slug := workspaceSlug(repo.URL)
+	if ws == "" {
+		return 0, 0, fmt.Errorf("cannot parse workspace/slug from URL: %s", repo.URL)
+	}
+
+	apiURL := fmt.Sprintf("%s/2.0/repositories/%s/%s/diffstat/%s",
+		b.baseURL, url.PathEscape(ws), url.PathEscape(slug), url.PathEscape(hash))
+
+	resp, err := b.doGet(ctx, apiURL)
+	if err != nil {
+		return 0, 0, fmt.Errorf("bitbucket diffstat API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, 0, fmt.Errorf("bitbucket diffstat API returned status %d", resp.StatusCode)
+	}
+
+	var page struct {
+		Values []bitbucketDiffStat `json:"values"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+		return 0, 0, fmt.Errorf("decode bitbucket diffstat: %w", err)
+	}
+
+	var additions, deletions int64
+	for _, d := range page.Values {
+		additions += d.LinesAdded
+		deletions += d.LinesRemoved
+	}
+
+	return additions, deletions, nil
+}
+
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {

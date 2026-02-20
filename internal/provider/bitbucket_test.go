@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/dsablic/codemium/internal/model"
 	"github.com/dsablic/codemium/internal/provider"
 )
 
@@ -159,5 +161,79 @@ func TestBitbucketExcludeForks(t *testing.T) {
 	}
 	if repos[0].Slug != "original" {
 		t.Errorf("expected original, got %s", repos[0].Slug)
+	}
+}
+
+func TestBitbucketListCommits(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/commits") {
+			json.NewEncoder(w).Encode(map[string]any{
+				"values": []map[string]any{
+					{
+						"hash":    "abc123",
+						"message": "feat: add feature\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+						"author": map[string]any{
+							"raw": "Dev <dev@example.com>",
+						},
+					},
+					{
+						"hash":    "def456",
+						"message": "fix: bug",
+						"author": map[string]any{
+							"raw": "Dev <dev@example.com>",
+						},
+					},
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	bb := provider.NewBitbucket("test-token", "", server.URL)
+	commits, err := bb.ListCommits(context.Background(), model.Repo{
+		Slug: "repo-1",
+		URL:  "https://bitbucket.org/myworkspace/repo-1",
+	}, 100)
+	if err != nil {
+		t.Fatalf("ListCommits: %v", err)
+	}
+	if len(commits) != 2 {
+		t.Fatalf("expected 2 commits, got %d", len(commits))
+	}
+	if commits[0].Hash != "abc123" {
+		t.Errorf("expected hash abc123, got %s", commits[0].Hash)
+	}
+}
+
+func TestBitbucketCommitStats(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/diffstat/abc123") {
+			json.NewEncoder(w).Encode(map[string]any{
+				"values": []map[string]any{
+					{"lines_added": 100, "lines_removed": 20},
+					{"lines_added": 50, "lines_removed": 10},
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	bb := provider.NewBitbucket("test-token", "", server.URL)
+	additions, deletions, err := bb.CommitStats(context.Background(), model.Repo{
+		Slug: "repo-1",
+		URL:  "https://bitbucket.org/myworkspace/repo-1",
+	}, "abc123")
+	if err != nil {
+		t.Fatalf("CommitStats: %v", err)
+	}
+	if additions != 150 {
+		t.Errorf("expected 150 additions, got %d", additions)
+	}
+	if deletions != 30 {
+		t.Errorf("expected 30 deletions, got %d", deletions)
 	}
 }
