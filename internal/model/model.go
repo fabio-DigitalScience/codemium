@@ -45,12 +45,43 @@ type RepoStats struct {
 	URL        string          `json:"url"`
 	Languages  []LanguageStats `json:"languages"`
 	Totals     Stats           `json:"totals"`
+	AIEstimate *AIEstimate     `json:"ai_estimate,omitempty"`
 }
 
 // RepoError records a repository that failed to process.
 type RepoError struct {
 	Repository string `json:"repository"`
 	Error      string `json:"error"`
+}
+
+// AISignal represents why a commit was flagged as AI-authored.
+type AISignal string
+
+const (
+	SignalCoAuthor      AISignal = "co-author"
+	SignalCommitMessage AISignal = "commit-message"
+	SignalBotAuthor     AISignal = "bot-author"
+)
+
+// AICommit represents a single AI-attributed commit.
+type AICommit struct {
+	Hash      string     `json:"hash"`
+	Author    string     `json:"author"`
+	Message   string     `json:"message"`
+	Signals   []AISignal `json:"signals"`
+	Additions int64      `json:"additions"`
+	Deletions int64      `json:"deletions"`
+}
+
+// AIEstimate holds AI attribution metrics.
+type AIEstimate struct {
+	TotalCommits    int64      `json:"total_commits"`
+	AICommits       int64      `json:"ai_commits"`
+	CommitPercent   float64    `json:"commit_percent"`
+	TotalAdditions  int64      `json:"total_additions"`
+	AIAdditions     int64      `json:"ai_additions"`
+	AdditionPercent float64    `json:"addition_percent"`
+	Details         []AICommit `json:"details,omitempty"`
 }
 
 // Filters records what filters were applied to the analysis.
@@ -94,4 +125,5 @@ type Report struct {
 	Totals       Stats           `json:"totals"`
 	ByLanguage   []LanguageStats `json:"by_language"`
 	Errors       []RepoError     `json:"errors,omitempty"`
+	AIEstimate   *AIEstimate     `json:"ai_estimate,omitempty"`
 }
