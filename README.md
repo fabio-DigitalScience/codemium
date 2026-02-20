@@ -5,14 +5,14 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/dsablic/codemium)](https://goreportcard.com/report/github.com/dsablic/codemium)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Generate code statistics across all repositories in a Bitbucket Cloud workspace or GitHub organization. Produces per-repo and aggregate metrics including lines of code, comments, blanks, and cyclomatic complexity for 200+ languages.
+Generate code statistics across all repositories in a Bitbucket Cloud workspace, GitHub organization, or GitHub user account. Produces per-repo and aggregate metrics including lines of code, comments, blanks, and cyclomatic complexity for 200+ languages.
 
 ## Features
 
-- Analyze all repos in a Bitbucket workspace or GitHub organization
+- Analyze all repos in a Bitbucket workspace, GitHub organization, or GitHub user account
 - Filter by Bitbucket projects, specific repos, or exclusion lists
 - Per-language breakdown: files, code lines, comments, blanks, complexity
-- JSON output (default) and optional markdown summary
+- JSON output to file (default: `output/report.json`) and optional markdown summary
 - Parallel processing with configurable concurrency
 - Progress bar in terminal, plain text fallback in CI/CD
 - Pure Go, no external dependencies at runtime (no git or scc binary needed)
@@ -155,10 +155,10 @@ codemium markdown trends.json > trends.md
 ### Output options
 
 ```bash
-# JSON to stdout (default)
+# JSON to default file (output/report.json)
 codemium analyze --provider github --org myorg
 
-# JSON to file
+# JSON to custom file
 codemium analyze --provider github --org myorg --output report.json
 
 # Markdown summary

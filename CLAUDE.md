@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Codemium is a Go CLI tool that generates code statistics (LOC, comments, blanks, cyclomatic complexity) across all repositories in a Bitbucket Cloud workspace or GitHub organization.
+Codemium is a Go CLI tool that generates code statistics (LOC, comments, blanks, cyclomatic complexity) across all repositories in a Bitbucket Cloud workspace, GitHub organization, or GitHub user account.
 
 ## Build & Test
 
