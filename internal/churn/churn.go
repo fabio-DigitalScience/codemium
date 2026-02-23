@@ -87,3 +87,32 @@ func Analyze(ctx context.Context, cl provider.ChurnLister, repo model.Repo, comm
 		TopFiles:     topFiles,
 	}, nil
 }
+
+const maxHotspots = 10
+
+func ComputeHotspots(files []model.FileChurn, complexity map[string]int64, limit int) []model.FileChurn {
+	if limit <= 0 {
+		limit = maxHotspots
+	}
+
+	var hotspots []model.FileChurn
+	for _, f := range files {
+		c, ok := complexity[f.Path]
+		if !ok || c == 0 {
+			continue
+		}
+		hotspots = append(hotspots, model.FileChurn{
+			Path: f.Path, Changes: f.Changes, Additions: f.Additions, Deletions: f.Deletions,
+			Complexity: c, Hotspot: float64(f.Changes) * float64(c),
+		})
+	}
+
+	sort.Slice(hotspots, func(i, j int) bool {
+		return hotspots[i].Hotspot > hotspots[j].Hotspot
+	})
+
+	if len(hotspots) > limit {
+		hotspots = hotspots[:limit]
+	}
+	return hotspots
+}

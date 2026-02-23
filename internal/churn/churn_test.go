@@ -74,3 +74,26 @@ func TestAnalyzeChurnLimit(t *testing.T) {
 		t.Errorf("expected 1 commit (limited), got %d", stats.TotalCommits)
 	}
 }
+
+func TestComputeHotspots(t *testing.T) {
+	files := []model.FileChurn{
+		{Path: "complex.go", Changes: 10, Additions: 500, Deletions: 100},
+		{Path: "simple.go", Changes: 20, Additions: 200, Deletions: 50},
+		{Path: "util.go", Changes: 5, Additions: 100, Deletions: 20},
+	}
+	complexity := map[string]int64{"complex.go": 50, "simple.go": 2, "util.go": 10}
+
+	hotspots := churn.ComputeHotspots(files, complexity, 10)
+	if len(hotspots) != 3 {
+		t.Fatalf("expected 3 hotspots, got %d", len(hotspots))
+	}
+	if hotspots[0].Path != "complex.go" {
+		t.Errorf("expected complex.go as top hotspot, got %s", hotspots[0].Path)
+	}
+	if hotspots[0].Complexity != 50 {
+		t.Errorf("expected complexity 50, got %d", hotspots[0].Complexity)
+	}
+	if hotspots[0].Hotspot != 500 {
+		t.Errorf("expected hotspot score 500, got %f", hotspots[0].Hotspot)
+	}
+}
