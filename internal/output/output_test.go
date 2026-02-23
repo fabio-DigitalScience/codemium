@@ -198,6 +198,28 @@ func TestWriteMarkdownWithAIEstimate(t *testing.T) {
 	}
 }
 
+func TestWriteMarkdownLicenseColumn(t *testing.T) {
+	report := sampleReport()
+	report.Repositories[0].License = "MIT"
+	// Leave Repositories[1].License empty to test em-dash fallback
+
+	var buf bytes.Buffer
+	if err := output.WriteMarkdown(&buf, report); err != nil {
+		t.Fatalf("WriteMarkdown: %v", err)
+	}
+
+	md := buf.String()
+	if !strings.Contains(md, "| License |") {
+		t.Error("markdown should contain License column header")
+	}
+	if !strings.Contains(md, "| MIT |") {
+		t.Error("markdown should contain MIT license value")
+	}
+	if !strings.Contains(md, "| \u2014 |") {
+		t.Error("markdown should contain em-dash for missing license")
+	}
+}
+
 func TestWriteMarkdownWithoutAIEstimate(t *testing.T) {
 	report := sampleReport()
 

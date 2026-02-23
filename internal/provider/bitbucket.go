@@ -309,6 +309,17 @@ type bitbucketDiffStat struct {
 	LinesRemoved int64 `json:"lines_removed"`
 }
 
+type bitbucketDiffStatEntry struct {
+	New *struct {
+		Path string `json:"path"`
+	} `json:"new"`
+	Old *struct {
+		Path string `json:"path"`
+	} `json:"old"`
+	LinesAdded   int64 `json:"lines_added"`
+	LinesRemoved int64 `json:"lines_removed"`
+}
+
 // CommitStats fetches addition/deletion counts for a single Bitbucket commit.
 func (b *Bitbucket) CommitStats(ctx context.Context, repo model.Repo, hash string) (int64, int64, error) {
 	ws, slug := workspaceSlug(repo.URL)
@@ -343,6 +354,51 @@ func (b *Bitbucket) CommitStats(ctx context.Context, repo model.Repo, hash strin
 	}
 
 	return additions, deletions, nil
+}
+
+// CommitFileStats fetches per-file addition/deletion counts for a single Bitbucket commit.
+func (b *Bitbucket) CommitFileStats(ctx context.Context, repo model.Repo, hash string) ([]FileChange, error) {
+	ws, slug := workspaceSlug(repo.URL)
+	if ws == "" {
+		return nil, fmt.Errorf("cannot parse workspace/slug from URL: %s", repo.URL)
+	}
+
+	var all []FileChange
+	nextURL := fmt.Sprintf("%s/2.0/repositories/%s/%s/diffstat/%s",
+		b.baseURL, url.PathEscape(ws), url.PathEscape(slug), url.PathEscape(hash))
+
+	for nextURL != "" {
+		resp, err := b.doGet(ctx, nextURL)
+		if err != nil {
+			return nil, fmt.Errorf("bitbucket diffstat API: %w", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, fmt.Errorf("bitbucket diffstat API returned status %d", resp.StatusCode)
+		}
+
+		var page struct {
+			Values []bitbucketDiffStatEntry `json:"values"`
+			Next   string                   `json:"next"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decode bitbucket diffstat: %w", err)
+		}
+		resp.Body.Close()
+
+		for _, d := range page.Values {
+			path := ""
+			if d.New != nil {
+				path = d.New.Path
+			} else if d.Old != nil {
+				path = d.Old.Path
+			}
+			all = append(all, FileChange{Path: path, Additions: d.LinesAdded, Deletions: d.LinesRemoved})
+		}
+		nextURL = page.Next
+	}
+	return all, nil
 }
 
 func contains(slice []string, item string) bool {

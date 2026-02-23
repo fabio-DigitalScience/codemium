@@ -25,7 +25,7 @@ func AnalyzeDetails(ctx context.Context, lister provider.CommitLister, repo mode
 	if len(commits) == 0 {
 		return &model.RepoHealthDetails{
 			AuthorsByWindow: map[string]int{},
-			ChurnByWindow:   map[string]model.ChurnStats{},
+			ChurnByWindow:   map[string]model.WindowChurnStats{},
 		}, nil
 	}
 
@@ -38,7 +38,7 @@ func AnalyzeDetails(ctx context.Context, lister provider.CommitLister, repo mode
 		Window6to12:  {},
 		Window12Plus: {},
 	}
-	churn := map[string]*model.ChurnStats{
+	churn := map[string]*model.WindowChurnStats{
 		Window0to6:   {},
 		Window6to12:  {},
 		Window12Plus: {},
@@ -133,7 +133,7 @@ func AnalyzeDetails(ctx context.Context, lister provider.CommitLister, repo mode
 	}
 
 	// Build churn by window
-	churnByWindow := map[string]model.ChurnStats{}
+	churnByWindow := map[string]model.WindowChurnStats{}
 	for window, cs := range churn {
 		if cs.Commits > 0 {
 			churnByWindow[window] = *cs

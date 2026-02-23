@@ -8,6 +8,8 @@ import (
 	"sync"
 
 	"github.com/boyter/scc/v3/processor"
+	enry "github.com/go-enry/go-enry/v2"
+
 	"github.com/dsablic/codemium/internal/model"
 )
 
@@ -30,6 +32,7 @@ func New() *Analyzer {
 func (a *Analyzer) Analyze(ctx context.Context, dir string) (*model.RepoStats, error) {
 	langMap := map[string]*model.LanguageStats{}
 	var totalFiles int64
+	var filteredFiles int64
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -38,16 +41,39 @@ func (a *Analyzer) Analyze(ctx context.Context, dir string) (*model.RepoStats, e
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+
+		relPath, relErr := filepath.Rel(dir, path)
+		if relErr != nil {
+			relPath = path
+		}
+
 		if info.IsDir() {
 			base := info.Name()
-			if base == ".git" || base == "node_modules" || base == "vendor" || base == ".hg" {
+			// Always skip VCS directories (enry doesn't handle these)
+			if base == ".git" || base == ".hg" {
+				return filepath.SkipDir
+			}
+			// Use enry for vendor directory detection
+			if enry.IsVendor(relPath + "/") {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 
+		// Check if file path is a vendor file
+		if enry.IsVendor(relPath) {
+			filteredFiles++
+			return nil
+		}
+
 		content, err := os.ReadFile(path)
 		if err != nil {
+			return nil
+		}
+
+		// Check if file is generated
+		if enry.IsGenerated(relPath, content) {
+			filteredFiles++
 			return nil
 		}
 
@@ -95,6 +121,7 @@ func (a *Analyzer) Analyze(ctx context.Context, dir string) (*model.RepoStats, e
 	}
 
 	stats := &model.RepoStats{}
+	stats.FilteredFiles = filteredFiles
 	for _, lang := range langMap {
 		stats.Languages = append(stats.Languages, *lang)
 		stats.Totals.Files += lang.Files

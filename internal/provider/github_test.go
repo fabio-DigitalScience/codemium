@@ -191,6 +191,38 @@ func TestGitHubCommitStats(t *testing.T) {
 	}
 }
 
+func TestGitHubCommitFileStats(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/repos/myorg/repo-1/commits/abc123" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"sha": "abc123",
+				"stats": map[string]any{"additions": 150, "deletions": 30},
+				"files": []map[string]any{
+					{"filename": "main.go", "additions": 100, "deletions": 20},
+					{"filename": "util.go", "additions": 50, "deletions": 10},
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	gh := provider.NewGitHub("test-token", server.URL)
+	files, err := gh.CommitFileStats(context.Background(), model.Repo{
+		Slug: "repo-1", URL: "https://github.com/myorg/repo-1",
+	}, "abc123")
+	if err != nil {
+		t.Fatalf("CommitFileStats: %v", err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(files))
+	}
+	if files[0].Path != "main.go" || files[0].Additions != 100 {
+		t.Errorf("unexpected first file: %+v", files[0])
+	}
+}
+
 func TestGitHubListCommitsLimit(t *testing.T) {
 	page := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

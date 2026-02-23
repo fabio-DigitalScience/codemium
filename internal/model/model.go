@@ -28,13 +28,14 @@ type LanguageStats struct {
 
 // Stats holds aggregate code statistics.
 type Stats struct {
-	Repos      int   `json:"repos,omitempty"`
-	Files      int64 `json:"files"`
-	Lines      int64 `json:"lines"`
-	Code       int64 `json:"code"`
-	Comments   int64 `json:"comments"`
-	Blanks     int64 `json:"blanks"`
-	Complexity int64 `json:"complexity"`
+	Repos         int   `json:"repos,omitempty"`
+	Files         int64 `json:"files"`
+	Lines         int64 `json:"lines"`
+	Code          int64 `json:"code"`
+	Comments      int64 `json:"comments"`
+	Blanks        int64 `json:"blanks"`
+	Complexity    int64 `json:"complexity"`
+	FilteredFiles int64 `json:"filtered_files,omitempty"`
 }
 
 // RepoStats holds the analysis results for a single repository.
@@ -43,8 +44,11 @@ type RepoStats struct {
 	Project       string             `json:"project,omitempty"`
 	Provider      string             `json:"provider"`
 	URL           string             `json:"url"`
+	License       string             `json:"license,omitempty"`
 	Languages     []LanguageStats    `json:"languages"`
 	Totals        Stats              `json:"totals"`
+	FilteredFiles int64              `json:"filtered_files,omitempty"`
+	Churn         *ChurnStats        `json:"churn,omitempty"`
 	AIEstimate    *AIEstimate        `json:"ai_estimate,omitempty"`
 	Health        *RepoHealth        `json:"health,omitempty"`
 	HealthDetails *RepoHealthDetails `json:"health_details,omitempty"`
@@ -54,6 +58,23 @@ type RepoStats struct {
 type RepoError struct {
 	Repository string `json:"repository"`
 	Error      string `json:"error"`
+}
+
+// FileChurn holds churn metrics for a single file.
+type FileChurn struct {
+	Path       string  `json:"path"`
+	Changes    int64   `json:"changes"`
+	Additions  int64   `json:"additions"`
+	Deletions  int64   `json:"deletions"`
+	Complexity int64   `json:"complexity,omitempty"`
+	Hotspot    float64 `json:"hotspot,omitempty"`
+}
+
+// ChurnStats holds code churn and hotspot data for a repository.
+type ChurnStats struct {
+	TotalCommits int64       `json:"total_commits"`
+	TopFiles     []FileChurn `json:"top_files"`
+	Hotspots     []FileChurn `json:"hotspots,omitempty"`
 }
 
 // AISignal represents why a commit was flagged as AI-authored.
@@ -104,14 +125,14 @@ type RepoHealth struct {
 
 // RepoHealthDetails holds deep health analysis for a repository.
 type RepoHealthDetails struct {
-	AuthorsByWindow map[string]int        `json:"authors_by_window,omitempty"`
-	ChurnByWindow   map[string]ChurnStats `json:"churn_by_window,omitempty"`
-	BusFactor       float64               `json:"bus_factor"`
-	VelocityTrend   float64               `json:"velocity_trend"`
+	AuthorsByWindow map[string]int              `json:"authors_by_window,omitempty"`
+	ChurnByWindow   map[string]WindowChurnStats `json:"churn_by_window,omitempty"`
+	BusFactor       float64                     `json:"bus_factor"`
+	VelocityTrend   float64                     `json:"velocity_trend"`
 }
 
-// ChurnStats holds code churn metrics for a time window.
-type ChurnStats struct {
+// WindowChurnStats holds code churn metrics for a time window.
+type WindowChurnStats struct {
 	Additions int64 `json:"additions"`
 	Deletions int64 `json:"deletions"`
 	NetChurn  int64 `json:"net_churn"`

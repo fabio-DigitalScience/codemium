@@ -12,6 +12,9 @@ Generate code statistics across all repositories in a Bitbucket Cloud workspace,
 - Analyze all repos in a Bitbucket workspace, GitHub organization, GitHub user account, or GitLab group
 - Filter by Bitbucket projects, specific repos, or exclusion lists
 - Per-language breakdown: files, code lines, comments, blanks, complexity
+- Automatic vendor/generated/binary file filtering for accurate metrics (powered by go-enry)
+- Per-repo license detection with SPDX identifiers (e.g., MIT, Apache-2.0)
+- Code churn and hotspot analysis: find files that change most often and are most complex
 - JSON output to file (default: `output/report.json`) and optional markdown summary
 - Parallel processing with configurable concurrency
 - Progress bar in terminal, plain text fallback in CI/CD
@@ -293,6 +296,8 @@ Health categories:
 --health                    # Classify repos by activity level
 --health-details            # Deep health analysis (implies --health)
 --health-commit-limit 500   # Max commits for health details (default: 500)
+--churn                     # Enable code churn and hotspot analysis
+--churn-limit 500           # Max commits to scan per repo for churn (default: 500)
 ```
 
 ## Output Format

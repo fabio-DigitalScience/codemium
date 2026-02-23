@@ -39,7 +39,11 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 	fmt.Fprintf(w, "| Code | %d |\n", report.Totals.Code)
 	fmt.Fprintf(w, "| Comments | %d |\n", report.Totals.Comments)
 	fmt.Fprintf(w, "| Blanks | %d |\n", report.Totals.Blanks)
-	fmt.Fprintf(w, "| Complexity | %d |\n\n", report.Totals.Complexity)
+	fmt.Fprintf(w, "| Complexity | %d |\n", report.Totals.Complexity)
+	if report.Totals.FilteredFiles > 0 {
+		fmt.Fprintf(w, "| Filtered Files | %d |\n", report.Totals.FilteredFiles)
+	}
+	fmt.Fprintln(w)
 
 	// AI Code Estimation (only if present)
 	if report.AIEstimate != nil {
@@ -84,8 +88,8 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 	fmt.Fprintf(w, "## Repositories\n\n")
 
 	// Build header based on which optional columns are present
-	header := "| Repository | Project | Files | Code | Comments | Complexity"
-	separator := "|------------|---------|------:|-----:|---------:|-----------:"
+	header := "| Repository | Project | License | Files | Code | Comments | Complexity"
+	separator := "|------------|---------|---------|------:|-----:|---------:|-----------:"
 	if hasHealth {
 		header += " | Health"
 		separator += "|-------:"
@@ -97,19 +101,23 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 	fmt.Fprintf(w, "%s |\n%s|\n", header, separator)
 
 	for _, repo := range report.Repositories {
-		fmt.Fprintf(w, "| [%s](%s) | %s | %d | %d | %d | %d",
-			repo.Repository, repo.URL, repo.Project, repo.Totals.Files, repo.Totals.Code,
+		lic := repo.License
+		if lic == "" {
+			lic = "\u2014"
+		}
+		fmt.Fprintf(w, "| [%s](%s) | %s | %s | %d | %d | %d | %d",
+			repo.Repository, repo.URL, repo.Project, lic, repo.Totals.Files, repo.Totals.Code,
 			repo.Totals.Comments, repo.Totals.Complexity)
 		if hasHealth {
-			healthStr := "—"
+			healthStr := "\u2014"
 			if repo.Health != nil {
 				healthStr = fmt.Sprintf("%s (%dd)", capitalize(string(repo.Health.Category)), repo.Health.DaysSinceCommit)
 			}
 			fmt.Fprintf(w, " | %s", healthStr)
 		}
 		if hasAI {
-			aiPct := "—"
-			aiAdd := "—"
+			aiPct := "\u2014"
+			aiAdd := "\u2014"
 			if repo.AIEstimate != nil {
 				aiPct = fmt.Sprintf("%.1f%%", repo.AIEstimate.CommitPercent)
 				aiAdd = fmt.Sprintf("%d", repo.AIEstimate.AIAdditions)
@@ -148,6 +156,43 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 				}
 			}
 			fmt.Fprintln(w)
+		}
+	}
+
+	// Code Churn
+	var hasChurn bool
+	for _, repo := range report.Repositories {
+		if repo.Churn != nil && len(repo.Churn.TopFiles) > 0 {
+			hasChurn = true
+			break
+		}
+	}
+
+	if hasChurn {
+		fmt.Fprintf(w, "## Code Churn\n\n")
+		for _, repo := range report.Repositories {
+			if repo.Churn == nil || len(repo.Churn.TopFiles) == 0 {
+				continue
+			}
+			fmt.Fprintf(w, "### %s\n\n", repo.Repository)
+			fmt.Fprintf(w, "**Commits scanned:** %d\n\n", repo.Churn.TotalCommits)
+
+			fmt.Fprintf(w, "| File | Changes | Additions | Deletions |\n")
+			fmt.Fprintf(w, "|------|--------:|----------:|----------:|\n")
+			for _, f := range repo.Churn.TopFiles {
+				fmt.Fprintf(w, "| %s | %d | %d | %d |\n", f.Path, f.Changes, f.Additions, f.Deletions)
+			}
+			fmt.Fprintln(w)
+
+			if len(repo.Churn.Hotspots) > 0 {
+				fmt.Fprintf(w, "**Hotspots** (high churn x high complexity):\n\n")
+				fmt.Fprintf(w, "| File | Changes | Complexity | Hotspot Score |\n")
+				fmt.Fprintf(w, "|------|--------:|-----------:|--------------:|\n")
+				for _, h := range repo.Churn.Hotspots {
+					fmt.Fprintf(w, "| %s | %d | %d | %.0f |\n", h.Path, h.Changes, h.Complexity, h.Hotspot)
+				}
+				fmt.Fprintln(w)
+			}
 		}
 	}
 
