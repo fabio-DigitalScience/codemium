@@ -32,15 +32,18 @@ type Project struct {
 // NewBitbucket creates a new Bitbucket provider. If baseURL is empty,
 // the default Bitbucket Cloud API endpoint is used. If username is
 // non-empty, Basic Auth is used instead of Bearer token auth.
-func NewBitbucket(token, username, baseURL string) *Bitbucket {
+func NewBitbucket(token, username, baseURL string, client *http.Client) *Bitbucket {
 	if baseURL == "" {
 		baseURL = bitbucketAPIBase
+	}
+	if client == nil {
+		client = &http.Client{}
 	}
 	return &Bitbucket{
 		token:    token,
 		username: username,
 		baseURL:  baseURL,
-		client:   &http.Client{},
+		client:   client,
 	}
 }
 

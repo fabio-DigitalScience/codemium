@@ -58,7 +58,7 @@ func TestBitbucketListRepos(t *testing.T) {
 	}))
 	defer server.Close()
 
-	bb := provider.NewBitbucket("test-token", "", server.URL)
+	bb := provider.NewBitbucket("test-token", "", server.URL, nil)
 	repos, err := bb.ListRepos(context.Background(), provider.ListOpts{
 		Workspace: "myworkspace",
 	})
@@ -87,7 +87,7 @@ func TestBitbucketFilterByProject(t *testing.T) {
 	}))
 	defer server.Close()
 
-	bb := provider.NewBitbucket("test-token", "", server.URL)
+	bb := provider.NewBitbucket("test-token", "", server.URL, nil)
 	bb.ListRepos(context.Background(), provider.ListOpts{
 		Workspace: "myworkspace",
 		Projects:  []string{"PROJ1", "PROJ2"},
@@ -106,7 +106,7 @@ func TestBitbucketBasicAuth(t *testing.T) {
 	}))
 	defer server.Close()
 
-	bb := provider.NewBitbucket("app-pass", "myuser", server.URL)
+	bb := provider.NewBitbucket("app-pass", "myuser", server.URL, nil)
 	bb.ListRepos(context.Background(), provider.ListOpts{Workspace: "ws"})
 
 	if gotAuth == "" {
@@ -150,7 +150,7 @@ func TestBitbucketExcludeForks(t *testing.T) {
 	}))
 	defer server.Close()
 
-	bb := provider.NewBitbucket("test-token", "", server.URL)
+	bb := provider.NewBitbucket("test-token", "", server.URL, nil)
 
 	repos, _ := bb.ListRepos(context.Background(), provider.ListOpts{
 		Workspace:    "ws",
@@ -193,7 +193,7 @@ func TestBitbucketListCommits(t *testing.T) {
 	}))
 	defer server.Close()
 
-	bb := provider.NewBitbucket("test-token", "", server.URL)
+	bb := provider.NewBitbucket("test-token", "", server.URL, nil)
 	commits, err := bb.ListCommits(context.Background(), model.Repo{
 		Slug: "repo-1",
 		URL:  "https://bitbucket.org/myworkspace/repo-1",
@@ -230,7 +230,7 @@ func TestBitbucketCommitStats(t *testing.T) {
 	}))
 	defer server.Close()
 
-	bb := provider.NewBitbucket("test-token", "", server.URL)
+	bb := provider.NewBitbucket("test-token", "", server.URL, nil)
 	additions, deletions, err := bb.CommitStats(context.Background(), model.Repo{
 		Slug: "repo-1",
 		URL:  "https://bitbucket.org/myworkspace/repo-1",

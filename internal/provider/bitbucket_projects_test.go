@@ -35,7 +35,7 @@ func TestBitbucketListProjects(t *testing.T) {
 	}))
 	defer server.Close()
 
-	bb := provider.NewBitbucket("token", "user", server.URL)
+	bb := provider.NewBitbucket("token", "user", server.URL, nil)
 	projects, err := bb.ListProjects(context.Background(), "myws")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -59,7 +59,7 @@ func TestBitbucketListProjectsAuth(t *testing.T) {
 	}))
 	defer server.Close()
 
-	bb := provider.NewBitbucket("token", "user", server.URL)
+	bb := provider.NewBitbucket("token", "user", server.URL, nil)
 	bb.ListProjects(context.Background(), "ws")
 
 	if len(gotAuth) < 6 || gotAuth[:6] != "Basic " {

@@ -24,14 +24,17 @@ type GitLab struct {
 
 // NewGitLab creates a new GitLab provider. If baseURL is empty,
 // the default GitLab.com endpoint is used.
-func NewGitLab(token string, baseURL string) *GitLab {
+func NewGitLab(token string, baseURL string, client *http.Client) *GitLab {
 	if baseURL == "" {
 		baseURL = gitlabAPIBase
+	}
+	if client == nil {
+		client = &http.Client{}
 	}
 	return &GitLab{
 		token:   token,
 		baseURL: baseURL,
-		client:  &http.Client{},
+		client:  client,
 	}
 }
 

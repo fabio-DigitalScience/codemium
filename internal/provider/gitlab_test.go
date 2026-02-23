@@ -53,7 +53,7 @@ func TestGitLabListRepos(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gl := provider.NewGitLab("test-token", server.URL)
+	gl := provider.NewGitLab("test-token", server.URL, nil)
 	repos, err := gl.ListRepos(context.Background(), provider.ListOpts{
 		Organization: "mygroup",
 	})
@@ -103,7 +103,7 @@ func TestGitLabExcludeForksAndArchived(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gl := provider.NewGitLab("test-token", server.URL)
+	gl := provider.NewGitLab("test-token", server.URL, nil)
 	repos, _ := gl.ListRepos(context.Background(), provider.ListOpts{
 		Organization:    "g",
 		IncludeArchived: true, // server-side filter disabled so we test client-side fork filter
@@ -122,7 +122,7 @@ func TestGitLabIncludeSlugFilter(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gl := provider.NewGitLab("test-token", server.URL)
+	gl := provider.NewGitLab("test-token", server.URL, nil)
 	repos, _ := gl.ListRepos(context.Background(), provider.ListOpts{
 		Organization: "g",
 		Repos:        []string{"repo-a"},
@@ -141,7 +141,7 @@ func TestGitLabExcludeSlugFilter(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gl := provider.NewGitLab("test-token", server.URL)
+	gl := provider.NewGitLab("test-token", server.URL, nil)
 	repos, _ := gl.ListRepos(context.Background(), provider.ListOpts{
 		Organization: "g",
 		Exclude:      []string{"repo-b"},
@@ -160,7 +160,7 @@ func TestGitLabAuthHeader(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gl := provider.NewGitLab("my-pat", server.URL)
+	gl := provider.NewGitLab("my-pat", server.URL, nil)
 	gl.ListRepos(context.Background(), provider.ListOpts{Organization: "g"})
 }
 
@@ -173,7 +173,7 @@ func TestGitLabSelfHosted(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gl := provider.NewGitLab("test-token", server.URL)
+	gl := provider.NewGitLab("test-token", server.URL, nil)
 	_, err := gl.ListRepos(context.Background(), provider.ListOpts{Organization: "mygroup"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -205,7 +205,7 @@ func TestGitLabListCommits(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gl := provider.NewGitLab("test-token", server.URL)
+	gl := provider.NewGitLab("test-token", server.URL, nil)
 	commits, err := gl.ListCommits(context.Background(), model.Repo{
 		Slug: "repo-1",
 		URL:  server.URL + "/mygroup/repo-1",
@@ -246,7 +246,7 @@ func TestGitLabCommitStats(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gl := provider.NewGitLab("test-token", server.URL)
+	gl := provider.NewGitLab("test-token", server.URL, nil)
 	additions, deletions, err := gl.CommitStats(context.Background(), model.Repo{
 		Slug: "repo-1",
 		URL:  server.URL + "/mygroup/repo-1",
@@ -282,7 +282,7 @@ func TestGitLabListCommitsLimit(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gl := provider.NewGitLab("test-token", server.URL)
+	gl := provider.NewGitLab("test-token", server.URL, nil)
 	commits, err := gl.ListCommits(context.Background(), model.Repo{
 		Slug: "repo-1",
 		URL:  server.URL + "/mygroup/repo-1",

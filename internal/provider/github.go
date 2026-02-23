@@ -24,14 +24,17 @@ type GitHub struct {
 
 // NewGitHub creates a new GitHub provider. If baseURL is empty,
 // the default GitHub API endpoint is used.
-func NewGitHub(token string, baseURL string) *GitHub {
+func NewGitHub(token string, baseURL string, client *http.Client) *GitHub {
 	if baseURL == "" {
 		baseURL = githubAPIBase
+	}
+	if client == nil {
+		client = &http.Client{}
 	}
 	return &GitHub{
 		token:   token,
 		baseURL: baseURL,
-		client:  &http.Client{},
+		client:  client,
 	}
 }
 
