@@ -20,6 +20,7 @@ import (
 
 	"github.com/dsablic/codemium/internal/aiestimate"
 	"github.com/dsablic/codemium/internal/analyzer"
+	"github.com/dsablic/codemium/internal/churn"
 	"github.com/dsablic/codemium/internal/license"
 	"github.com/dsablic/codemium/internal/auth"
 	"github.com/dsablic/codemium/internal/history"
@@ -197,6 +198,8 @@ func newAnalyzeCmd() *cobra.Command {
 	cmd.Flags().String("output", "output/report.json", "Write JSON to file")
 	cmd.Flags().Bool("ai-estimate", false, "Estimate AI-written code percentage")
 	cmd.Flags().Int("ai-commit-limit", 500, "Max commits to scan per repo for AI estimation (0 = unlimited)")
+	cmd.Flags().Bool("churn", false, "Analyze code churn and hotspots")
+	cmd.Flags().Int("churn-limit", 500, "Max commits to scan per repo for churn analysis (0 = unlimited)")
 
 	cmd.MarkFlagRequired("provider")
 
@@ -419,6 +422,61 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 			if results[i].Stats != nil {
 				if est, ok := aiByRepo[results[i].Repo.Slug]; ok {
 					results[i].Stats.AIEstimate = est
+				}
+			}
+		}
+	}
+
+	// Churn analysis phase
+	churnFlag, _ := cmd.Flags().GetBool("churn")
+	churnLimit, _ := cmd.Flags().GetInt("churn-limit")
+
+	if churnFlag {
+		churnLister, ok := prov.(provider.ChurnLister)
+		if !ok {
+			return fmt.Errorf("provider %s does not support churn analysis", providerName)
+		}
+
+		fmt.Fprintln(os.Stderr, "Analyzing code churn...")
+
+		if useTUI {
+			program = ui.RunTUI(len(repoList))
+			go func() { program.Run() }()
+		}
+
+		churnProgressFn := func(completed, total int, repo model.Repo) {
+			if useTUI && program != nil {
+				program.Send(ui.ProgressMsg{Completed: completed, Total: total, RepoName: repo.Slug})
+			} else {
+				fmt.Fprintf(os.Stderr, "[%d/%d] Churn %s\n", completed, total, repo.Slug)
+			}
+		}
+
+		churnResults := worker.RunWithProgress(ctx, repoList, concurrency, func(ctx context.Context, repo model.Repo) (*model.RepoStats, error) {
+			stats, err := churn.Analyze(ctx, churnLister, repo, churnLimit)
+			if err != nil {
+				return nil, err
+			}
+			return &model.RepoStats{Repository: repo.Slug, Churn: stats}, nil
+		}, churnProgressFn)
+
+		if useTUI && program != nil {
+			program.Send(ui.DoneMsg{})
+			time.Sleep(100 * time.Millisecond)
+			program.Quit()
+			program = nil
+		}
+
+		churnByRepo := make(map[string]*model.ChurnStats)
+		for _, r := range churnResults {
+			if r.Err == nil && r.Stats != nil && r.Stats.Churn != nil {
+				churnByRepo[r.Repo.Slug] = r.Stats.Churn
+			}
+		}
+		for i := range results {
+			if results[i].Stats != nil {
+				if cs, ok := churnByRepo[results[i].Repo.Slug]; ok {
+					results[i].Stats.Churn = cs
 				}
 			}
 		}
