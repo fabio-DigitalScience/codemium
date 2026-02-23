@@ -116,14 +116,14 @@ func TestGitHubListCommits(t *testing.T) {
 				{
 					"sha": "abc123",
 					"commit": map[string]any{
-						"author":  map[string]any{"name": "Dev", "email": "dev@example.com"},
+						"author":  map[string]any{"name": "Dev", "email": "dev@example.com", "date": "2025-06-15T10:30:00Z"},
 						"message": "feat: add feature\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
 					},
 				},
 				{
 					"sha": "def456",
 					"commit": map[string]any{
-						"author":  map[string]any{"name": "Dev", "email": "dev@example.com"},
+						"author":  map[string]any{"name": "Dev", "email": "dev@example.com", "date": "2025-06-14T09:00:00Z"},
 						"message": "fix: bug",
 					},
 				},
@@ -150,6 +150,12 @@ func TestGitHubListCommits(t *testing.T) {
 	}
 	if !strings.Contains(commits[0].Message, "Co-Authored-By") {
 		t.Error("expected full commit message with trailers")
+	}
+	if commits[0].Date.IsZero() {
+		t.Error("expected commit date to be parsed")
+	}
+	if commits[0].Date.Year() != 2025 || commits[0].Date.Month() != 6 || commits[0].Date.Day() != 15 {
+		t.Errorf("expected date 2025-06-15, got %s", commits[0].Date)
 	}
 }
 

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Codemium is a Go CLI tool that generates code statistics (LOC, comments, blanks, cyclomatic complexity) across all repositories in a Bitbucket Cloud workspace, GitHub organization, or GitHub user account.
+Codemium is a Go CLI tool that generates code statistics (LOC, comments, blanks, cyclomatic complexity) across all repositories in a Bitbucket Cloud workspace, GitHub organization, GitHub user account, or GitLab group.
 
 ## Build & Test
 
@@ -23,10 +23,12 @@ internal/
     credentials.go     FileStore: ~/.config/codemium/credentials.json
     bitbucket.go       Authorization code grant with local callback server
     github.go          Device flow + gh CLI token fallback
+    gitlab.go          glab CLI token fallback
   provider/            Repository listing from APIs
     provider.go        Provider interface definition
     bitbucket.go       Bitbucket Cloud REST API v2.0
     github.go          GitHub REST API
+    gitlab.go          GitLab REST API v4
   analyzer/
     analyzer.go        Code analysis using scc as a Go library
     clone.go           Shallow/full cloning via go-git with token auth + checkout
@@ -42,6 +44,10 @@ internal/
     detect.go           AI signal detection (co-author, message patterns, bot authors)
   aiestimate/
     estimate.go         AI estimation orchestrator (per-repo commit scanning)
+  health/
+    health.go           Health classification (Classify, ClassifyFromCommits)
+    details.go          Deep health analysis (authors, churn, velocity per window)
+    summary.go          Aggregate health summary across repos
   output/
     json.go            JSON report writer
     markdown.go        Markdown report writer
@@ -59,10 +65,11 @@ internal/
 - **Provider abstraction**: `provider.Provider` interface allows adding new git hosting providers. Each provider implements `ListRepos(ctx, ListOpts)`.
 - **Worker pool**: Bounded goroutine pool with semaphore pattern. Configurable concurrency via `--concurrency` flag.
 - **Partial failure**: Repos that fail to clone or analyze are recorded as errors in the report; the run continues.
-- **Auth**: Credentials stored at `~/.config/codemium/credentials.json` (0600 perms). Resolution order: env vars (`CODEMIUM_<PROVIDER>_TOKEN`) → saved credentials → `gh auth token` CLI (GitHub only).
+- **Auth**: Credentials stored at `~/.config/codemium/credentials.json` (0600 perms). Resolution order: env vars (`CODEMIUM_<PROVIDER>_TOKEN`) → saved credentials → CLI fallback (`gh auth token` for GitHub, `glab auth token` for GitLab).
 - **Clone strategy**: Shallow clone (depth 1, single branch, no tags) to temp dir, deleted after analysis.
 - **scc initialization**: `processor.ProcessConstants()` called via `sync.Once` since scc requires global initialization.
 - **AI estimation**: When `--ai-estimate` is used, a second pass fetches commit history via provider REST APIs. `provider.CommitLister` interface provides `ListCommits` and `CommitStats`. `aidetect.Detect` classifies commits, `aiestimate.Estimate` orchestrates per-repo. Results attach to existing report model as optional fields.
+- **Health classification**: When `--health` is used, repos are classified as Active (<180d), Maintained (180-365d), or Abandoned (>365d) based on last commit date. `--health-details` adds deep analysis: per-window author counts, code churn, bus factor, and velocity trend. Uses the same `CommitLister` interface.
 
 ## Conventions
 

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/dsablic/codemium/internal/model"
 )
@@ -151,6 +152,7 @@ type githubCommit struct {
 		Author struct {
 			Name  string `json:"name"`
 			Email string `json:"email"`
+			Date  string `json:"date"`
 		} `json:"author"`
 		Message string `json:"message"`
 	} `json:"commit"`
@@ -194,10 +196,12 @@ func (g *GitHub) ListCommits(ctx context.Context, repo model.Repo, limit int) ([
 		resp.Body.Close()
 
 		for _, c := range commits {
+			commitDate, _ := time.Parse(time.RFC3339, c.Commit.Author.Date)
 			all = append(all, CommitInfo{
 				Hash:    c.SHA,
 				Author:  fmt.Sprintf("%s <%s>", c.Commit.Author.Name, c.Commit.Author.Email),
 				Message: c.Commit.Message,
+				Date:    commitDate,
 			})
 			if limit > 0 && len(all) >= limit {
 				return all, nil

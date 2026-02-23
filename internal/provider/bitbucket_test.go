@@ -171,6 +171,7 @@ func TestBitbucketListCommits(t *testing.T) {
 				"values": []map[string]any{
 					{
 						"hash":    "abc123",
+						"date":    "2025-06-15T10:30:00+00:00",
 						"message": "feat: add feature\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
 						"author": map[string]any{
 							"raw": "Dev <dev@example.com>",
@@ -178,6 +179,7 @@ func TestBitbucketListCommits(t *testing.T) {
 					},
 					{
 						"hash":    "def456",
+						"date":    "2025-06-14T09:00:00+00:00",
 						"message": "fix: bug",
 						"author": map[string]any{
 							"raw": "Dev <dev@example.com>",
@@ -204,6 +206,12 @@ func TestBitbucketListCommits(t *testing.T) {
 	}
 	if commits[0].Hash != "abc123" {
 		t.Errorf("expected hash abc123, got %s", commits[0].Hash)
+	}
+	if commits[0].Date.IsZero() {
+		t.Error("expected commit date to be parsed")
+	}
+	if commits[0].Date.Year() != 2025 || commits[0].Date.Month() != 6 || commits[0].Date.Day() != 15 {
+		t.Errorf("expected date 2025-06-15, got %s", commits[0].Date)
 	}
 }
 

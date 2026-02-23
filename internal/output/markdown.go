@@ -5,9 +5,17 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"github.com/dsablic/codemium/internal/model"
 )
+
+func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
 
 // WriteMarkdown writes the report as GitHub-flavored markdown to w.
 func WriteMarkdown(w io.Writer, report model.Report) error {
@@ -46,6 +54,20 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 		fmt.Fprintln(w)
 	}
 
+	// Repository Health (only if present)
+	if report.HealthSummary != nil {
+		fmt.Fprintf(w, "## Repository Health\n\n")
+		fmt.Fprintf(w, "| Category | Repos | Code Lines | %% of Code |\n")
+		fmt.Fprintf(w, "|----------|------:|-----------:|----------:|\n")
+		fmt.Fprintf(w, "| Active (<180d) | %d | %d | %.1f%% |\n",
+			report.HealthSummary.Active.Repos, report.HealthSummary.Active.Code, report.HealthSummary.Active.CodePercent)
+		fmt.Fprintf(w, "| Maintained (180-365d) | %d | %d | %.1f%% |\n",
+			report.HealthSummary.Maintained.Repos, report.HealthSummary.Maintained.Code, report.HealthSummary.Maintained.CodePercent)
+		fmt.Fprintf(w, "| Abandoned (>365d) | %d | %d | %.1f%% |\n",
+			report.HealthSummary.Abandoned.Repos, report.HealthSummary.Abandoned.Code, report.HealthSummary.Abandoned.CodePercent)
+		fmt.Fprintln(w)
+	}
+
 	// By language
 	fmt.Fprintf(w, "## Languages\n\n")
 	fmt.Fprintf(w, "| Language | Files | Code | Comments | Blanks | Complexity |\n")
@@ -58,15 +80,33 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 
 	// Per repository
 	hasAI := report.AIEstimate != nil
+	hasHealth := report.HealthSummary != nil
 	fmt.Fprintf(w, "## Repositories\n\n")
-	if hasAI {
-		fmt.Fprintf(w, "| Repository | Project | Files | Code | Comments | Complexity | AI Commits %% | AI Additions |\n")
-		fmt.Fprintf(w, "|------------|---------|------:|-----:|---------:|-----------:|-------------:|-------------:|\n")
-	} else {
-		fmt.Fprintf(w, "| Repository | Project | Files | Code | Comments | Complexity |\n")
-		fmt.Fprintf(w, "|------------|---------|------:|-----:|---------:|-----------:|\n")
+
+	// Build header based on which optional columns are present
+	header := "| Repository | Project | Files | Code | Comments | Complexity"
+	separator := "|------------|---------|------:|-----:|---------:|-----------:"
+	if hasHealth {
+		header += " | Health"
+		separator += "|-------:"
 	}
+	if hasAI {
+		header += " | AI Commits % | AI Additions"
+		separator += "|-------------:|-------------:"
+	}
+	fmt.Fprintf(w, "%s |\n%s|\n", header, separator)
+
 	for _, repo := range report.Repositories {
+		fmt.Fprintf(w, "| [%s](%s) | %s | %d | %d | %d | %d",
+			repo.Repository, repo.URL, repo.Project, repo.Totals.Files, repo.Totals.Code,
+			repo.Totals.Comments, repo.Totals.Complexity)
+		if hasHealth {
+			healthStr := "—"
+			if repo.Health != nil {
+				healthStr = fmt.Sprintf("%s (%dd)", capitalize(string(repo.Health.Category)), repo.Health.DaysSinceCommit)
+			}
+			fmt.Fprintf(w, " | %s", healthStr)
+		}
 		if hasAI {
 			aiPct := "—"
 			aiAdd := "—"
@@ -74,16 +114,42 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 				aiPct = fmt.Sprintf("%.1f%%", repo.AIEstimate.CommitPercent)
 				aiAdd = fmt.Sprintf("%d", repo.AIEstimate.AIAdditions)
 			}
-			fmt.Fprintf(w, "| [%s](%s) | %s | %d | %d | %d | %d | %s | %s |\n",
-				repo.Repository, repo.URL, repo.Project, repo.Totals.Files, repo.Totals.Code,
-				repo.Totals.Comments, repo.Totals.Complexity, aiPct, aiAdd)
-		} else {
-			fmt.Fprintf(w, "| [%s](%s) | %s | %d | %d | %d | %d |\n",
-				repo.Repository, repo.URL, repo.Project, repo.Totals.Files, repo.Totals.Code,
-				repo.Totals.Comments, repo.Totals.Complexity)
+			fmt.Fprintf(w, " | %s | %s", aiPct, aiAdd)
 		}
+		fmt.Fprintln(w, " |")
 	}
 	fmt.Fprintln(w)
+
+	// Health Details (only if present)
+	if hasHealth {
+		var hasDetails bool
+		for _, repo := range report.Repositories {
+			if repo.HealthDetails != nil {
+				hasDetails = true
+				break
+			}
+		}
+		if hasDetails {
+			fmt.Fprintf(w, "## Health Details\n\n")
+			fmt.Fprintf(w, "| Repository | Window | Authors | Commits | Additions | Deletions | Net Churn |\n")
+			fmt.Fprintf(w, "|------------|--------|--------:|--------:|----------:|----------:|----------:|\n")
+			for _, repo := range report.Repositories {
+				if repo.HealthDetails == nil {
+					continue
+				}
+				for _, window := range []string{"0-6mo", "6-12mo", "12mo+"} {
+					cs, hasChurn := repo.HealthDetails.ChurnByWindow[window]
+					authors := repo.HealthDetails.AuthorsByWindow[window]
+					if !hasChurn && authors == 0 {
+						continue
+					}
+					fmt.Fprintf(w, "| %s | %s | %d | %d | %d | %d | %d |\n",
+						repo.Repository, window, authors, cs.Commits, cs.Additions, cs.Deletions, cs.NetChurn)
+				}
+			}
+			fmt.Fprintln(w)
+		}
+	}
 
 	// Errors
 	if len(report.Errors) > 0 {
