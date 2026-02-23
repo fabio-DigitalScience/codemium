@@ -273,6 +273,7 @@ func newAnalyzeCmd() *cobra.Command {
 	cmd.Flags().Int("health-commit-limit", 500, "Max commits to scan per repo for health details (0 = unlimited)")
 	cmd.Flags().Bool("churn", false, "Analyze code churn and hotspots")
 	cmd.Flags().Int("churn-limit", 500, "Max commits to scan per repo for churn analysis (0 = unlimited)")
+	cmd.Flags().Float64("rate-limit", 0, "Max API requests per second (0 = unlimited)")
 
 	cmd.MarkFlagRequired("provider")
 
@@ -295,6 +296,10 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	includeForks, _ := cmd.Flags().GetBool("include-forks")
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
 	outputPath, _ := cmd.Flags().GetString("output")
+	rateLimit, _ := cmd.Flags().GetFloat64("rate-limit")
+
+	// Create rate-limited HTTP client
+	httpClient := &http.Client{Transport: &provider.RateLimitTransport{ReqPerSec: rateLimit}}
 
 	// Load credentials
 	store := auth.NewFileStore(auth.DefaultStorePath())
@@ -322,7 +327,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		if workspace == "" {
 			return fmt.Errorf("--workspace is required for bitbucket")
 		}
-		prov = provider.NewBitbucket(cred.AccessToken, cred.Username, "")
+		prov = provider.NewBitbucket(cred.AccessToken, cred.Username, "", httpClient)
 	case "github":
 		if org != "" && user != "" {
 			return fmt.Errorf("--org and --user are mutually exclusive for github")
@@ -330,13 +335,13 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		if org == "" && user == "" {
 			return fmt.Errorf("--org or --user is required for github")
 		}
-		prov = provider.NewGitHub(cred.AccessToken, "")
+		prov = provider.NewGitHub(cred.AccessToken, "", httpClient)
 	case "gitlab":
 		if group == "" {
 			return fmt.Errorf("--group is required for gitlab")
 		}
 		baseURL := os.Getenv("CODEMIUM_GITLAB_URL")
-		prov = provider.NewGitLab(cred.AccessToken, baseURL)
+		prov = provider.NewGitLab(cred.AccessToken, baseURL, httpClient)
 	default:
 		return fmt.Errorf("unsupported provider: %s", providerName)
 	}
@@ -946,6 +951,7 @@ func newTrendsCmd() *cobra.Command {
 	cmd.Flags().Bool("include-forks", false, "Include forked repos")
 	cmd.Flags().Int("concurrency", 5, "Number of parallel workers")
 	cmd.Flags().String("output", "output/report.json", "Write JSON to file")
+	cmd.Flags().Float64("rate-limit", 0, "Max API requests per second (0 = unlimited)")
 
 	cmd.MarkFlagRequired("provider")
 	cmd.MarkFlagRequired("since")
@@ -972,6 +978,7 @@ func runTrends(cmd *cobra.Command, args []string) error {
 	includeForks, _ := cmd.Flags().GetBool("include-forks")
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
 	outputPath, _ := cmd.Flags().GetString("output")
+	rateLimit, _ := cmd.Flags().GetFloat64("rate-limit")
 
 	if interval != "monthly" && interval != "weekly" {
 		return fmt.Errorf("--interval must be 'monthly' or 'weekly'")
@@ -994,13 +1001,15 @@ func runTrends(cmd *cobra.Command, args []string) error {
 		store.Save(providerName, cred)
 	}
 
+	httpClient := &http.Client{Transport: &provider.RateLimitTransport{ReqPerSec: rateLimit}}
+
 	var prov provider.Provider
 	switch providerName {
 	case "bitbucket":
 		if workspace == "" {
 			return fmt.Errorf("--workspace is required for bitbucket")
 		}
-		prov = provider.NewBitbucket(cred.AccessToken, cred.Username, "")
+		prov = provider.NewBitbucket(cred.AccessToken, cred.Username, "", httpClient)
 	case "github":
 		if org != "" && user != "" {
 			return fmt.Errorf("--org and --user are mutually exclusive for github")
@@ -1008,13 +1017,13 @@ func runTrends(cmd *cobra.Command, args []string) error {
 		if org == "" && user == "" {
 			return fmt.Errorf("--org or --user is required for github")
 		}
-		prov = provider.NewGitHub(cred.AccessToken, "")
+		prov = provider.NewGitHub(cred.AccessToken, "", httpClient)
 	case "gitlab":
 		if group == "" {
 			return fmt.Errorf("--group is required for gitlab")
 		}
 		baseURL := os.Getenv("CODEMIUM_GITLAB_URL")
-		prov = provider.NewGitLab(cred.AccessToken, baseURL)
+		prov = provider.NewGitLab(cred.AccessToken, baseURL, httpClient)
 	default:
 		return fmt.Errorf("unsupported provider: %s", providerName)
 	}

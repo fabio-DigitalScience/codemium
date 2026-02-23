@@ -47,7 +47,7 @@ func TestGitHubListRepos(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gh := provider.NewGitHub("test-token", server.URL)
+	gh := provider.NewGitHub("test-token", server.URL, nil)
 	repos, err := gh.ListRepos(context.Background(), provider.ListOpts{
 		Organization: "myorg",
 	})
@@ -72,7 +72,7 @@ func TestGitHubListReposUser(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gh := provider.NewGitHub("test-token", server.URL)
+	gh := provider.NewGitHub("test-token", server.URL, nil)
 	repos, err := gh.ListRepos(context.Background(), provider.ListOpts{
 		User: "myuser",
 	})
@@ -97,7 +97,7 @@ func TestGitHubExcludeForksAndArchived(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gh := provider.NewGitHub("test-token", server.URL)
+	gh := provider.NewGitHub("test-token", server.URL, nil)
 	repos, _ := gh.ListRepos(context.Background(), provider.ListOpts{
 		Organization: "org",
 	})
@@ -134,7 +134,7 @@ func TestGitHubListCommits(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gh := provider.NewGitHub("test-token", server.URL)
+	gh := provider.NewGitHub("test-token", server.URL, nil)
 	commits, err := gh.ListCommits(context.Background(), model.Repo{
 		Slug: "repo-1",
 		URL:  "https://github.com/myorg/repo-1",
@@ -175,7 +175,7 @@ func TestGitHubCommitStats(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gh := provider.NewGitHub("test-token", server.URL)
+	gh := provider.NewGitHub("test-token", server.URL, nil)
 	additions, deletions, err := gh.CommitStats(context.Background(), model.Repo{
 		Slug: "repo-1",
 		URL:  "https://github.com/myorg/repo-1",
@@ -208,7 +208,7 @@ func TestGitHubCommitFileStats(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gh := provider.NewGitHub("test-token", server.URL)
+	gh := provider.NewGitHub("test-token", server.URL, nil)
 	files, err := gh.CommitFileStats(context.Background(), model.Repo{
 		Slug: "repo-1", URL: "https://github.com/myorg/repo-1",
 	}, "abc123")
@@ -241,7 +241,7 @@ func TestGitHubListCommitsLimit(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gh := provider.NewGitHub("test-token", server.URL)
+	gh := provider.NewGitHub("test-token", server.URL, nil)
 	commits, err := gh.ListCommits(context.Background(), model.Repo{
 		Slug: "repo-1",
 		URL:  "https://github.com/myorg/repo-1",

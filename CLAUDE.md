@@ -26,6 +26,7 @@ internal/
     gitlab.go          glab CLI token fallback
   provider/            Repository listing from APIs
     provider.go        Provider interface definition
+    ratelimit.go       Rate-limited HTTP transport (429 retry + token-bucket)
     bitbucket.go       Bitbucket Cloud REST API v2.0
     github.go          GitHub REST API
     gitlab.go          GitLab REST API v4
@@ -70,6 +71,7 @@ internal/
 
 - **Provider abstraction**: `provider.Provider` interface allows adding new git hosting providers. Each provider implements `ListRepos(ctx, ListOpts)`.
 - **Worker pool**: Bounded goroutine pool with semaphore pattern. Configurable concurrency via `--concurrency` flag.
+- **Rate limiting**: `RateLimitTransport` in `provider/ratelimit.go` implements `http.RoundTripper` with token-bucket rate limiting and 429 retry (exponential backoff, `Retry-After` header). Injected via `--rate-limit` flag (default: 0 = unlimited, retry-only). All providers accept `*http.Client` to share the transport.
 - **Partial failure**: Repos that fail to clone or analyze are recorded as errors in the report; the run continues.
 - **Auth**: Credentials stored at `~/.config/codemium/credentials.json` (0600 perms). Resolution order: env vars (`CODEMIUM_<PROVIDER>_TOKEN`) → saved credentials → CLI fallback (`gh auth token` for GitHub, `glab auth token` for GitLab).
 - **Clone strategy**: Shallow clone (depth 1, single branch, no tags) to temp dir, deleted after analysis.
