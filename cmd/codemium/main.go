@@ -574,6 +574,7 @@ func buildReport(providerName, workspace, org string, projects, repos, exclude [
 		report.Totals.Comments += r.Stats.Totals.Comments
 		report.Totals.Blanks += r.Stats.Totals.Blanks
 		report.Totals.Complexity += r.Stats.Totals.Complexity
+		report.Totals.FilteredFiles += r.Stats.FilteredFiles
 
 		for _, lang := range r.Stats.Languages {
 			lt, ok := langTotals[lang.Name]
