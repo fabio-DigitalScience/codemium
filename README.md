@@ -5,11 +5,11 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/dsablic/codemium)](https://goreportcard.com/report/github.com/dsablic/codemium)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Generate code statistics across all repositories in a Bitbucket Cloud workspace, GitHub organization, or GitHub user account. Produces per-repo and aggregate metrics including lines of code, comments, blanks, and cyclomatic complexity for 200+ languages.
+Generate code statistics across all repositories in a Bitbucket Cloud workspace, GitHub organization, GitHub user account, or GitLab group. Produces per-repo and aggregate metrics including lines of code, comments, blanks, and cyclomatic complexity for 200+ languages.
 
 ## Features
 
-- Analyze all repos in a Bitbucket workspace, GitHub organization, or GitHub user account
+- Analyze all repos in a Bitbucket workspace, GitHub organization, GitHub user account, or GitLab group
 - Filter by Bitbucket projects, specific repos, or exclusion lists
 - Per-language breakdown: files, code lines, comments, blanks, complexity
 - JSON output to file (default: `output/report.json`) and optional markdown summary
@@ -97,6 +97,40 @@ export CODEMIUM_GITHUB_TOKEN=your_personal_access_token
 
 **Resolution order:** `CODEMIUM_GITHUB_TOKEN` env var > saved credentials > `gh auth token` CLI.
 
+### GitLab
+
+**Option 1: Personal access token (interactive)**
+
+1. Create a personal access token at https://gitlab.com/-/user_settings/personal_access_tokens with the `read_api` scope
+2. Run:
+   ```bash
+   codemium auth login --provider gitlab
+   ```
+   This prompts for your token, verifies it against the GitLab API, and stores it at `~/.config/codemium/credentials.json`.
+
+For self-hosted GitLab instances, set `CODEMIUM_GITLAB_URL`:
+```bash
+export CODEMIUM_GITLAB_URL=https://gitlab.example.com
+codemium auth login --provider gitlab
+```
+
+**Option 2: glab CLI**
+
+If you have the [GitLab CLI](https://gitlab.com/gitlab-org/cli) installed and authenticated, codemium can use its token automatically:
+
+```bash
+glab auth login
+codemium analyze --provider gitlab --group mygroup
+```
+
+**Option 3: Environment variable (CI/CD)**
+
+```bash
+export CODEMIUM_GITLAB_TOKEN=your_personal_access_token
+```
+
+**Resolution order:** `CODEMIUM_GITLAB_TOKEN` env var > saved credentials > `glab auth token` CLI.
+
 ## Usage
 
 ### Analyze a Bitbucket workspace
@@ -133,6 +167,22 @@ codemium analyze --provider github --user myuser
 
 # Specific repos
 codemium analyze --provider github --user myuser --repos repo1,repo2
+```
+
+### Analyze a GitLab group
+
+```bash
+# All repos in a group (includes subgroups)
+codemium analyze --provider gitlab --group mygroup
+
+# Nested group
+codemium analyze --provider gitlab --group myorg/mysubgroup
+
+# Specific repos
+codemium analyze --provider gitlab --group mygroup --repos api,frontend
+
+# Self-hosted GitLab
+CODEMIUM_GITLAB_URL=https://gitlab.example.com codemium analyze --provider gitlab --group mygroup
 ```
 
 ### Analyze trends over time

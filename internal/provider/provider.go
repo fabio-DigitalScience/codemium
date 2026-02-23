@@ -19,7 +19,7 @@ type ListOpts struct {
 	IncludeForks    bool
 }
 
-// Provider is the interface that both Bitbucket and GitHub implement
+// Provider is the interface that Bitbucket, GitHub, and GitLab implement
 // for listing repositories.
 type Provider interface {
 	ListRepos(ctx context.Context, opts ListOpts) ([]model.Repo, error)

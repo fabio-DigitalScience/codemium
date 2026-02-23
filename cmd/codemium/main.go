@@ -65,7 +65,7 @@ func newAuthCmd() *cobra.Command {
 		Short: "Authenticate with a provider",
 		RunE:  runAuthLogin,
 	}
-	loginCmd.Flags().String("provider", "", "Provider to authenticate with (bitbucket, github)")
+	loginCmd.Flags().String("provider", "", "Provider to authenticate with (bitbucket, github, gitlab)")
 	loginCmd.MarkFlagRequired("provider")
 
 	cmd.AddCommand(loginCmd)
@@ -105,8 +105,11 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("install gh CLI and run 'gh auth login', or set CODEMIUM_GITHUB_CLIENT_ID")
 		}
 
+	case "gitlab":
+		cred, err = loginGitLabPAT()
+
 	default:
-		return fmt.Errorf("unsupported provider: %s (use bitbucket or github)", providerName)
+		return fmt.Errorf("unsupported provider: %s (use bitbucket, github, or gitlab)", providerName)
 	}
 
 	if err != nil {
@@ -176,6 +179,63 @@ func loginBitbucketAPIToken() (auth.Credentials, error) {
 	}, nil
 }
 
+func loginGitLabPAT() (auth.Credentials, error) {
+	fmt.Fprintln(os.Stderr, "GitLab personal access token login")
+	fmt.Fprintln(os.Stderr, "Create a token at: https://gitlab.com/-/user_settings/personal_access_tokens")
+	fmt.Fprintln(os.Stderr, "  -> Required scope: read_api")
+	fmt.Fprintln(os.Stderr)
+
+	baseURL := os.Getenv("CODEMIUM_GITLAB_URL")
+	if baseURL == "" {
+		baseURL = "https://gitlab.com"
+	}
+
+	fmt.Fprint(os.Stderr, "Personal access token: ")
+	tokenBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Fprintln(os.Stderr) // newline after hidden input
+	if err != nil {
+		return auth.Credentials{}, fmt.Errorf("read token: %w", err)
+	}
+	token := strings.TrimSpace(string(tokenBytes))
+	if token == "" {
+		return auth.Credentials{}, fmt.Errorf("personal access token is required")
+	}
+
+	// Verify by calling the GitLab user API
+	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/v4/user", nil)
+	if err != nil {
+		return auth.Credentials{}, err
+	}
+	req.Header.Set("PRIVATE-TOKEN", token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return auth.Credentials{}, fmt.Errorf("verify credentials: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return auth.Credentials{}, fmt.Errorf("invalid personal access token")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return auth.Credentials{}, fmt.Errorf("gitlab API returned status %d", resp.StatusCode)
+	}
+
+	var user struct {
+		Username string `json:"username"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return auth.Credentials{}, fmt.Errorf("decode user response: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "Authenticated as %s\n", user.Username)
+
+	return auth.Credentials{
+		AccessToken: token,
+		Username:    user.Username,
+	}, nil
+}
+
 func newAnalyzeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "analyze",
@@ -183,10 +243,11 @@ func newAnalyzeCmd() *cobra.Command {
 		RunE:  runAnalyze,
 	}
 
-	cmd.Flags().String("provider", "", "Provider (bitbucket, github)")
+	cmd.Flags().String("provider", "", "Provider (bitbucket, github, gitlab)")
 	cmd.Flags().String("workspace", "", "Bitbucket workspace slug")
 	cmd.Flags().String("org", "", "GitHub organization")
 	cmd.Flags().String("user", "", "GitHub user (alternative to --org for personal repos)")
+	cmd.Flags().String("group", "", "GitLab group path or ID")
 	cmd.Flags().StringSlice("projects", nil, "Filter by Bitbucket project keys")
 	cmd.Flags().StringSlice("repos", nil, "Filter to specific repo names")
 	cmd.Flags().StringSlice("exclude", nil, "Exclude specific repos")
@@ -210,6 +271,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	workspace, _ := cmd.Flags().GetString("workspace")
 	org, _ := cmd.Flags().GetString("org")
 	user, _ := cmd.Flags().GetString("user")
+	group, _ := cmd.Flags().GetString("group")
 	projects, _ := cmd.Flags().GetStringSlice("projects")
 	repos, _ := cmd.Flags().GetStringSlice("repos")
 	exclude, _ := cmd.Flags().GetStringSlice("exclude")
@@ -253,6 +315,12 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("--org or --user is required for github")
 		}
 		prov = provider.NewGitHub(cred.AccessToken, "")
+	case "gitlab":
+		if group == "" {
+			return fmt.Errorf("--group is required for gitlab")
+		}
+		baseURL := os.Getenv("CODEMIUM_GITLAB_URL")
+		prov = provider.NewGitLab(cred.AccessToken, baseURL)
 	default:
 		return fmt.Errorf("unsupported provider: %s", providerName)
 	}
@@ -278,9 +346,15 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 
 	// List repos
 	fmt.Fprintln(os.Stderr, "Listing repositories...")
+	// For GitLab, pass group as Organization
+	listOrg := org
+	if group != "" {
+		listOrg = group
+	}
+
 	repoList, err := prov.ListRepos(ctx, provider.ListOpts{
 		Workspace:       workspace,
-		Organization:    org,
+		Organization:    listOrg,
 		User:            user,
 		Projects:        projects,
 		Repos:           repos,
@@ -422,10 +496,13 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Build report — use user as organization in metadata when --user is set
+	// Build report — use user/group as organization in metadata when set
 	reportOrg := org
 	if user != "" {
 		reportOrg = user
+	}
+	if group != "" {
+		reportOrg = group
 	}
 	report := buildReport(providerName, workspace, reportOrg, projects, repos, exclude, results)
 
@@ -634,10 +711,11 @@ func newTrendsCmd() *cobra.Command {
 		RunE:  runTrends,
 	}
 
-	cmd.Flags().String("provider", "", "Provider (bitbucket, github)")
+	cmd.Flags().String("provider", "", "Provider (bitbucket, github, gitlab)")
 	cmd.Flags().String("workspace", "", "Bitbucket workspace slug")
 	cmd.Flags().String("org", "", "GitHub organization")
 	cmd.Flags().String("user", "", "GitHub user (alternative to --org for personal repos)")
+	cmd.Flags().String("group", "", "GitLab group path or ID")
 	cmd.Flags().String("since", "", "Start period (YYYY-MM for monthly, YYYY-MM-DD for weekly)")
 	cmd.Flags().String("until", "", "End period (YYYY-MM for monthly, YYYY-MM-DD for weekly)")
 	cmd.Flags().String("interval", "monthly", "Interval: monthly or weekly")
@@ -663,6 +741,7 @@ func runTrends(cmd *cobra.Command, args []string) error {
 	workspace, _ := cmd.Flags().GetString("workspace")
 	org, _ := cmd.Flags().GetString("org")
 	user, _ := cmd.Flags().GetString("user")
+	group, _ := cmd.Flags().GetString("group")
 	since, _ := cmd.Flags().GetString("since")
 	until, _ := cmd.Flags().GetString("until")
 	interval, _ := cmd.Flags().GetString("interval")
@@ -709,14 +788,26 @@ func runTrends(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("--org or --user is required for github")
 		}
 		prov = provider.NewGitHub(cred.AccessToken, "")
+	case "gitlab":
+		if group == "" {
+			return fmt.Errorf("--group is required for gitlab")
+		}
+		baseURL := os.Getenv("CODEMIUM_GITLAB_URL")
+		prov = provider.NewGitLab(cred.AccessToken, baseURL)
 	default:
 		return fmt.Errorf("unsupported provider: %s", providerName)
+	}
+
+	// For GitLab, pass group as Organization
+	trendsOrg := org
+	if group != "" {
+		trendsOrg = group
 	}
 
 	fmt.Fprintln(os.Stderr, "Listing repositories...")
 	repoList, err := prov.ListRepos(ctx, provider.ListOpts{
 		Workspace:       workspace,
-		Organization:    org,
+		Organization:    trendsOrg,
 		User:            user,
 		Repos:           repos,
 		Exclude:         exclude,
@@ -817,6 +908,9 @@ func runTrends(cmd *cobra.Command, args []string) error {
 	reportOrg := org
 	if user != "" {
 		reportOrg = user
+	}
+	if group != "" {
+		reportOrg = group
 	}
 	report := buildTrendsReport(providerName, workspace, reportOrg, since, until, interval, periods, repos, exclude, results)
 
