@@ -2,6 +2,8 @@ package health
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -196,9 +198,12 @@ func TestAnalyzeDetails(t *testing.T) {
 	}
 
 	repo := model.Repo{Slug: "test-repo", URL: "https://github.com/org/test-repo"}
-	details, err := AnalyzeDetails(context.Background(), lister, repo, commits, now)
+	details, partialErrs, err := AnalyzeDetails(context.Background(), lister, repo, commits, now)
 	if err != nil {
 		t.Fatalf("AnalyzeDetails: %v", err)
+	}
+	if len(partialErrs) > 0 {
+		t.Errorf("unexpected partial errors: %v", partialErrs)
 	}
 
 	// 0-6mo: Alice, Bob (2 authors, 2 commits)
@@ -245,7 +250,7 @@ func TestAnalyzeDetailsEmpty(t *testing.T) {
 	lister := &mockCommitLister{}
 	repo := model.Repo{Slug: "empty-repo"}
 
-	details, err := AnalyzeDetails(context.Background(), lister, repo, nil, now)
+	details, _, err := AnalyzeDetails(context.Background(), lister, repo, nil, now)
 	if err != nil {
 		t.Fatalf("AnalyzeDetails: %v", err)
 	}
@@ -254,5 +259,35 @@ func TestAnalyzeDetailsEmpty(t *testing.T) {
 	}
 	if len(details.AuthorsByWindow) != 0 {
 		t.Errorf("expected empty authors, got %v", details.AuthorsByWindow)
+	}
+}
+
+func TestAnalyzeDetailsPartialErrors(t *testing.T) {
+	now := time.Date(2026, 2, 23, 0, 0, 0, 0, time.UTC)
+	commits := []provider.CommitInfo{
+		{Hash: "a1", Author: "Alice <alice@example.com>", Date: now.AddDate(0, -1, 0)},
+	}
+
+	lister := &mockCommitLister{
+		commits:  commits,
+		statsErr: fmt.Errorf("gitlab commit detail API returned status 403"),
+	}
+
+	repo := model.Repo{Slug: "test-repo", URL: "https://github.com/org/test-repo"}
+	details, partialErrs, err := AnalyzeDetails(context.Background(), lister, repo, commits, now)
+	if err != nil {
+		t.Fatalf("AnalyzeDetails: %v", err)
+	}
+	if details == nil {
+		t.Fatal("expected non-nil details")
+	}
+	if len(partialErrs) != 1 {
+		t.Fatalf("expected 1 partial error, got %d", len(partialErrs))
+	}
+	if !strings.Contains(partialErrs[0], "CommitStats a1") {
+		t.Errorf("expected partial error to reference hash a1, got %q", partialErrs[0])
+	}
+	if !strings.Contains(partialErrs[0], "403") {
+		t.Errorf("expected partial error to contain status code, got %q", partialErrs[0])
 	}
 }

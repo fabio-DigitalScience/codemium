@@ -277,6 +277,8 @@ Health categories:
 - **Abandoned**: > 365 days ago
 - **Failed**: commit history could not be fetched (API error, permissions, etc.)
 
+When API errors occur during health classification, AI estimation, or detailed analysis, an error log is automatically written next to the JSON report (e.g., `output/report.error.log` for `output/report.json`). Each line is prefixed with a category (`[health]`, `[health-details]`, `[ai-estimate]`, `[ai-estimate-detail]`) for easy filtering with `grep`.
+
 ### Additional flags
 
 ```bash

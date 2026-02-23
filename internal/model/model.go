@@ -122,6 +122,7 @@ type RepoHealth struct {
 	Category        HealthCategory `json:"category"`
 	LastCommitDate  string         `json:"last_commit_date"`
 	DaysSinceCommit int            `json:"days_since_commit"`
+	Error           string         `json:"error,omitempty"`
 }
 
 // RepoHealthDetails holds deep health analysis for a repository.

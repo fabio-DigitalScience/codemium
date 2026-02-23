@@ -52,8 +52,6 @@ type gitlabProject struct {
 	} `json:"namespace"`
 }
 
-// ListRepos fetches all projects in a GitLab group, handling
-// pagination automatically.
 func (g *GitLab) ListRepos(ctx context.Context, opts ListOpts) ([]model.Repo, error) {
 	var allRepos []model.Repo
 
@@ -217,11 +215,11 @@ func gitlabProjectID(repoURL string) string {
 }
 
 type gitlabCommit struct {
-	ID             string `json:"id"`
-	AuthorName     string `json:"author_name"`
-	AuthorEmail    string `json:"author_email"`
-	Message        string `json:"message"`
-	CommittedDate  string `json:"committed_date"`
+	ID            string `json:"id"`
+	AuthorName    string `json:"author_name"`
+	AuthorEmail   string `json:"author_email"`
+	Message       string `json:"message"`
+	CommittedDate string `json:"committed_date"`
 }
 
 // ListCommits fetches up to limit commits for a repo via the GitLab API.

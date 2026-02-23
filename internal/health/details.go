@@ -3,6 +3,7 @@ package health
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -21,12 +22,13 @@ const (
 )
 
 // AnalyzeDetails performs deep health analysis on a repo's commits.
-func AnalyzeDetails(ctx context.Context, lister provider.CommitLister, repo model.Repo, commits []provider.CommitInfo, now time.Time) (*model.RepoHealthDetails, error) {
+// It returns the details, a list of partial error messages (e.g. per-commit stat failures), and a fatal error.
+func AnalyzeDetails(ctx context.Context, lister provider.CommitLister, repo model.Repo, commits []provider.CommitInfo, now time.Time) (*model.RepoHealthDetails, []string, error) {
 	if len(commits) == 0 {
 		return &model.RepoHealthDetails{
 			AuthorsByWindow: map[string]int{},
 			ChurnByWindow:   map[string]model.WindowChurnStats{},
-		}, nil
+		}, nil, nil
 	}
 
 	sixMoAgo := now.AddDate(0, -6, 0)
@@ -63,7 +65,7 @@ func AnalyzeDetails(ctx context.Context, lister provider.CommitLister, repo mode
 	sem := make(chan struct{}, statsConcurrency)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	var firstErr error
+	var partialErrors []string
 
 	for i, c := range commits {
 		if ctx.Err() != nil {
@@ -78,9 +80,7 @@ func AnalyzeDetails(ctx context.Context, lister provider.CommitLister, repo mode
 			adds, dels, err := lister.CommitStats(ctx, repo, hash)
 			if err != nil {
 				mu.Lock()
-				if firstErr == nil {
-					firstErr = err
-				}
+				partialErrors = append(partialErrors, fmt.Sprintf("CommitStats %s: %v", hash, err))
 				mu.Unlock()
 				return
 			}
@@ -145,7 +145,7 @@ func AnalyzeDetails(ctx context.Context, lister provider.CommitLister, repo mode
 		ChurnByWindow:   churnByWindow,
 		BusFactor:       busFactor,
 		VelocityTrend:   velocityTrend,
-	}, nil
+	}, partialErrors, nil
 }
 
 func commitWindow(date time.Time, sixMoAgo, twelveMoAgo time.Time) string {

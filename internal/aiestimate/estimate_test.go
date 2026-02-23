@@ -40,7 +40,7 @@ func TestEstimateBasic(t *testing.T) {
 	}
 
 	repo := model.Repo{Slug: "test-repo", URL: "https://github.com/org/test-repo"}
-	estimate, err := aiestimate.Estimate(context.Background(), mock, repo, 500)
+	estimate, _, err := aiestimate.Estimate(context.Background(), mock, repo, 500)
 	if err != nil {
 		t.Fatalf("Estimate: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestEstimateNoAICommits(t *testing.T) {
 	}
 
 	repo := model.Repo{Slug: "test-repo", URL: "https://github.com/org/test-repo"}
-	estimate, err := aiestimate.Estimate(context.Background(), mock, repo, 500)
+	estimate, _, err := aiestimate.Estimate(context.Background(), mock, repo, 500)
 	if err != nil {
 		t.Fatalf("Estimate: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestEstimatePercentCalculation(t *testing.T) {
 	}
 
 	repo := model.Repo{Slug: "r", URL: "https://github.com/o/r"}
-	est, err := aiestimate.Estimate(context.Background(), mock, repo, 500)
+	est, _, err := aiestimate.Estimate(context.Background(), mock, repo, 500)
 	if err != nil {
 		t.Fatalf("Estimate: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestEstimateFirstLineMessage(t *testing.T) {
 	}
 
 	repo := model.Repo{Slug: "r", URL: "https://github.com/o/r"}
-	est, err := aiestimate.Estimate(context.Background(), mock, repo, 500)
+	est, _, err := aiestimate.Estimate(context.Background(), mock, repo, 500)
 	if err != nil {
 		t.Fatalf("Estimate: %v", err)
 	}
