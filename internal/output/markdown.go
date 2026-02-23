@@ -93,6 +93,43 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 	}
 	fmt.Fprintln(w)
 
+	// Code Churn
+	var hasChurn bool
+	for _, repo := range report.Repositories {
+		if repo.Churn != nil && len(repo.Churn.TopFiles) > 0 {
+			hasChurn = true
+			break
+		}
+	}
+
+	if hasChurn {
+		fmt.Fprintf(w, "## Code Churn\n\n")
+		for _, repo := range report.Repositories {
+			if repo.Churn == nil || len(repo.Churn.TopFiles) == 0 {
+				continue
+			}
+			fmt.Fprintf(w, "### %s\n\n", repo.Repository)
+			fmt.Fprintf(w, "**Commits scanned:** %d\n\n", repo.Churn.TotalCommits)
+
+			fmt.Fprintf(w, "| File | Changes | Additions | Deletions |\n")
+			fmt.Fprintf(w, "|------|--------:|----------:|----------:|\n")
+			for _, f := range repo.Churn.TopFiles {
+				fmt.Fprintf(w, "| %s | %d | %d | %d |\n", f.Path, f.Changes, f.Additions, f.Deletions)
+			}
+			fmt.Fprintln(w)
+
+			if len(repo.Churn.Hotspots) > 0 {
+				fmt.Fprintf(w, "**Hotspots** (high churn × high complexity):\n\n")
+				fmt.Fprintf(w, "| File | Changes | Complexity | Hotspot Score |\n")
+				fmt.Fprintf(w, "|------|--------:|-----------:|--------------:|\n")
+				for _, h := range repo.Churn.Hotspots {
+					fmt.Fprintf(w, "| %s | %d | %d | %.0f |\n", h.Path, h.Changes, h.Complexity, h.Hotspot)
+				}
+				fmt.Fprintln(w)
+			}
+		}
+	}
+
 	// Errors
 	if len(report.Errors) > 0 {
 		fmt.Fprintf(w, "## Errors\n\n")
