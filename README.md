@@ -126,7 +126,7 @@ codemium analyze --provider gitlab --group mygroup
 export CODEMIUM_GITLAB_TOKEN=your_personal_access_token
 ```
 
-**Resolution order:** `CODEMIUM_GITLAB_TOKEN` env var > saved credentials > `glab auth token` CLI.
+**Resolution order:** `CODEMIUM_GITLAB_TOKEN` env var > saved credentials > `glab config get token` CLI.
 
 ## Usage
 

@@ -73,7 +73,7 @@ internal/
 - **Worker pool**: Bounded goroutine pool with semaphore pattern. Configurable concurrency via `--concurrency` flag.
 - **Rate limiting**: `RateLimitTransport` in `provider/ratelimit.go` implements `http.RoundTripper` with token-bucket rate limiting and 429 retry (exponential backoff, `Retry-After` header). Injected via `--rate-limit` flag (default: 0 = unlimited, retry-only). All providers accept `*http.Client` to share the transport.
 - **Partial failure**: Repos that fail to clone or analyze are recorded as errors in the report; the run continues.
-- **Auth**: Credentials stored at `~/.config/codemium/credentials.json` (0600 perms). Resolution order: env vars (`CODEMIUM_<PROVIDER>_TOKEN`) → saved credentials → CLI fallback (`gh auth token` for GitHub, `glab auth token` for GitLab).
+- **Auth**: Credentials stored at `~/.config/codemium/credentials.json` (0600 perms). Resolution order: env vars (`CODEMIUM_<PROVIDER>_TOKEN`) → saved credentials → CLI fallback (`gh auth token` for GitHub, `glab config get token` for GitLab).
 - **Clone strategy**: Shallow clone (depth 1, single branch, no tags) to temp dir, deleted after analysis.
 - **scc initialization**: `processor.ProcessConstants()` called via `sync.Once` since scc requires global initialization.
 - **AI estimation**: When `--ai-estimate` is used, a second pass fetches commit history via provider REST APIs. `provider.CommitLister` interface provides `ListCommits` and `CommitStats`. `aidetect.Detect` classifies commits, `aiestimate.Estimate` orchestrates per-repo. Results attach to existing report model as optional fields.
@@ -89,7 +89,7 @@ internal/
 - All packages have corresponding `_test.go` files
 - Test servers (httptest) used for provider and auth tests
 - No external tools required at runtime (no git binary, no scc binary)
-- After code changes, update relevant docs (README.md, this file) to reflect new behavior, flags, auth flows, etc.
+- After code changes, update relevant docs (README.md, this file) to reflect new behavior, flags, auth flows, etc. Specifically: new CLI flags go in README's "Additional flags" table and usage examples; new architecture decisions go in the "Architecture Notes" section of this file; new packages go in the "Project Structure" section of this file.
 
 ## Release
 
