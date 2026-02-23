@@ -20,6 +20,7 @@ import (
 
 	"github.com/dsablic/codemium/internal/aiestimate"
 	"github.com/dsablic/codemium/internal/analyzer"
+	"github.com/dsablic/codemium/internal/license"
 	"github.com/dsablic/codemium/internal/auth"
 	"github.com/dsablic/codemium/internal/history"
 	"github.com/dsablic/codemium/internal/model"
@@ -343,6 +344,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 			return nil, err
 		}
 
+		stats.License = license.Detect(dir)
 		stats.Repository = repo.Slug
 		stats.Project = repo.Project
 		stats.Provider = repo.Provider

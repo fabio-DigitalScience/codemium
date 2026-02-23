@@ -44,6 +44,7 @@ type RepoStats struct {
 	Project       string          `json:"project,omitempty"`
 	Provider      string          `json:"provider"`
 	URL           string          `json:"url"`
+	License       string          `json:"license,omitempty"`
 	Languages     []LanguageStats `json:"languages"`
 	Totals        Stats           `json:"totals"`
 	FilteredFiles int64           `json:"filtered_files,omitempty"`
