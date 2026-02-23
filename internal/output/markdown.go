@@ -64,26 +64,30 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 	hasAI := report.AIEstimate != nil
 	fmt.Fprintf(w, "## Repositories\n\n")
 	if hasAI {
-		fmt.Fprintf(w, "| Repository | Project | Files | Code | Comments | Complexity | AI Commits %% | AI Additions |\n")
-		fmt.Fprintf(w, "|------------|---------|------:|-----:|---------:|-----------:|-------------:|-------------:|\n")
+		fmt.Fprintf(w, "| Repository | Project | License | Files | Code | Comments | Complexity | AI Commits %% | AI Additions |\n")
+		fmt.Fprintf(w, "|------------|---------|---------|------:|-----:|---------:|-----------:|-------------:|-------------:|\n")
 	} else {
-		fmt.Fprintf(w, "| Repository | Project | Files | Code | Comments | Complexity |\n")
-		fmt.Fprintf(w, "|------------|---------|------:|-----:|---------:|-----------:|\n")
+		fmt.Fprintf(w, "| Repository | Project | License | Files | Code | Comments | Complexity |\n")
+		fmt.Fprintf(w, "|------------|---------|---------|------:|-----:|---------:|-----------:|\n")
 	}
 	for _, repo := range report.Repositories {
+		lic := repo.License
+		if lic == "" {
+			lic = "\u2014"
+		}
 		if hasAI {
-			aiPct := "—"
-			aiAdd := "—"
+			aiPct := "\u2014"
+			aiAdd := "\u2014"
 			if repo.AIEstimate != nil {
 				aiPct = fmt.Sprintf("%.1f%%", repo.AIEstimate.CommitPercent)
 				aiAdd = fmt.Sprintf("%d", repo.AIEstimate.AIAdditions)
 			}
-			fmt.Fprintf(w, "| [%s](%s) | %s | %d | %d | %d | %d | %s | %s |\n",
-				repo.Repository, repo.URL, repo.Project, repo.Totals.Files, repo.Totals.Code,
+			fmt.Fprintf(w, "| [%s](%s) | %s | %s | %d | %d | %d | %d | %s | %s |\n",
+				repo.Repository, repo.URL, repo.Project, lic, repo.Totals.Files, repo.Totals.Code,
 				repo.Totals.Comments, repo.Totals.Complexity, aiPct, aiAdd)
 		} else {
-			fmt.Fprintf(w, "| [%s](%s) | %s | %d | %d | %d | %d |\n",
-				repo.Repository, repo.URL, repo.Project, repo.Totals.Files, repo.Totals.Code,
+			fmt.Fprintf(w, "| [%s](%s) | %s | %s | %d | %d | %d | %d |\n",
+				repo.Repository, repo.URL, repo.Project, lic, repo.Totals.Files, repo.Totals.Code,
 				repo.Totals.Comments, repo.Totals.Complexity)
 		}
 	}
