@@ -44,6 +44,10 @@ internal/
     detect.go           AI signal detection (co-author, message patterns, bot authors)
   aiestimate/
     estimate.go         AI estimation orchestrator (per-repo commit scanning)
+  health/
+    health.go           Health classification (Classify, ClassifyFromCommits)
+    details.go          Deep health analysis (authors, churn, velocity per window)
+    summary.go          Aggregate health summary across repos
   output/
     json.go            JSON report writer
     markdown.go        Markdown report writer
@@ -65,6 +69,7 @@ internal/
 - **Clone strategy**: Shallow clone (depth 1, single branch, no tags) to temp dir, deleted after analysis.
 - **scc initialization**: `processor.ProcessConstants()` called via `sync.Once` since scc requires global initialization.
 - **AI estimation**: When `--ai-estimate` is used, a second pass fetches commit history via provider REST APIs. `provider.CommitLister` interface provides `ListCommits` and `CommitStats`. `aidetect.Detect` classifies commits, `aiestimate.Estimate` orchestrates per-repo. Results attach to existing report model as optional fields.
+- **Health classification**: When `--health` is used, repos are classified as Active (<180d), Maintained (180-365d), or Abandoned (>365d) based on last commit date. `--health-details` adds deep analysis: per-window author counts, code churn, bus factor, and velocity trend. Uses the same `CommitLister` interface.
 
 ## Conventions
 

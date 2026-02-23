@@ -185,16 +185,18 @@ func TestGitLabListCommits(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/repository/commits") && !strings.Contains(r.URL.Path, "/repository/commits/") {
 			json.NewEncoder(w).Encode([]map[string]any{
 				{
-					"id":           "abc123",
-					"author_name":  "Dev",
-					"author_email": "dev@example.com",
-					"message":      "feat: add feature\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+					"id":             "abc123",
+					"author_name":    "Dev",
+					"author_email":   "dev@example.com",
+					"committed_date": "2025-06-15T10:30:00.000Z",
+					"message":        "feat: add feature\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
 				},
 				{
-					"id":           "def456",
-					"author_name":  "Dev",
-					"author_email": "dev@example.com",
-					"message":      "fix: bug",
+					"id":             "def456",
+					"author_name":    "Dev",
+					"author_email":   "dev@example.com",
+					"committed_date": "2025-06-14T09:00:00.000Z",
+					"message":        "fix: bug",
 				},
 			})
 			return
@@ -219,6 +221,12 @@ func TestGitLabListCommits(t *testing.T) {
 	}
 	if !strings.Contains(commits[0].Message, "Co-Authored-By") {
 		t.Error("expected full commit message with trailers")
+	}
+	if commits[0].Date.IsZero() {
+		t.Error("expected commit date to be parsed")
+	}
+	if commits[0].Date.Year() != 2025 || commits[0].Date.Month() != 6 || commits[0].Date.Day() != 15 {
+		t.Errorf("expected date 2025-06-15, got %s", commits[0].Date)
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 	"github.com/dsablic/codemium/internal/aiestimate"
 	"github.com/dsablic/codemium/internal/analyzer"
 	"github.com/dsablic/codemium/internal/auth"
+	"github.com/dsablic/codemium/internal/health"
 	"github.com/dsablic/codemium/internal/history"
 	"github.com/dsablic/codemium/internal/model"
 	"github.com/dsablic/codemium/internal/narrative"
@@ -257,6 +258,9 @@ func newAnalyzeCmd() *cobra.Command {
 	cmd.Flags().String("output", "output/report.json", "Write JSON to file")
 	cmd.Flags().Bool("ai-estimate", false, "Estimate AI-written code percentage")
 	cmd.Flags().Int("ai-commit-limit", 500, "Max commits to scan per repo for AI estimation (0 = unlimited)")
+	cmd.Flags().Bool("health", false, "Classify repos by activity (active/maintained/abandoned)")
+	cmd.Flags().Bool("health-details", false, "Deep health analysis: authors, churn, velocity per window (implies --health)")
+	cmd.Flags().Int("health-commit-limit", 500, "Max commits to scan per repo for health details (0 = unlimited)")
 
 	cmd.MarkFlagRequired("provider")
 
@@ -496,6 +500,94 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Health classification phase
+	healthFlag, _ := cmd.Flags().GetBool("health")
+	healthDetailsFlag, _ := cmd.Flags().GetBool("health-details")
+	healthCommitLimit, _ := cmd.Flags().GetInt("health-commit-limit")
+
+	if healthDetailsFlag {
+		healthFlag = true // --health-details implies --health
+	}
+
+	if healthFlag {
+		commitLister, ok := prov.(provider.CommitLister)
+		if !ok {
+			return fmt.Errorf("provider %s does not support health classification", providerName)
+		}
+
+		fmt.Fprintln(os.Stderr, "Classifying repository health...")
+
+		if useTUI {
+			program = ui.RunTUI(len(repoList))
+			go func() { program.Run() }()
+		}
+
+		commitLimit := 1
+		if healthDetailsFlag {
+			commitLimit = healthCommitLimit
+		}
+
+		healthProgressFn := func(completed, total int, repo model.Repo) {
+			if useTUI && program != nil {
+				program.Send(ui.ProgressMsg{
+					Completed: completed,
+					Total:     total,
+					RepoName:  repo.Slug,
+				})
+			} else {
+				fmt.Fprintf(os.Stderr, "[%d/%d] Health %s\n", completed, total, repo.Slug)
+			}
+		}
+
+		now := time.Now().UTC()
+		healthResults := worker.RunWithProgress(ctx, repoList, concurrency, func(ctx context.Context, repo model.Repo) (*model.RepoStats, error) {
+			commits, err := commitLister.ListCommits(ctx, repo, commitLimit)
+			if err != nil {
+				return nil, err
+			}
+
+			h := health.ClassifyFromCommits(commits, now)
+
+			var details *model.RepoHealthDetails
+			if healthDetailsFlag && len(commits) > 0 {
+				details, err = health.AnalyzeDetails(ctx, commitLister, repo, commits, now)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			return &model.RepoStats{
+				Repository:    repo.Slug,
+				Health:        h,
+				HealthDetails: details,
+			}, nil
+		}, healthProgressFn)
+
+		if useTUI && program != nil {
+			program.Send(ui.DoneMsg{})
+			time.Sleep(100 * time.Millisecond)
+			program.Quit()
+			program = nil
+		}
+
+		// Attach health data to analysis results
+		healthByRepo := make(map[string]*model.RepoStats)
+		for _, r := range healthResults {
+			if r.Err == nil && r.Stats != nil {
+				healthByRepo[r.Repo.Slug] = r.Stats
+			}
+		}
+
+		for i := range results {
+			if results[i].Stats != nil {
+				if hs, ok := healthByRepo[results[i].Repo.Slug]; ok {
+					results[i].Stats.Health = hs.Health
+					results[i].Stats.HealthDetails = hs.HealthDetails
+				}
+			}
+		}
+	}
+
 	// Build report — use user/group as organization in metadata when set
 	reportOrg := org
 	if user != "" {
@@ -700,6 +792,9 @@ func buildReport(providerName, workspace, org string, projects, repos, exclude [
 			AIAdditions:   aiAdditions,
 		}
 	}
+
+	// Aggregate health summary
+	report.HealthSummary = health.Summarize(report.Repositories)
 
 	return report
 }

@@ -262,14 +262,37 @@ codemium markdown --narrative --ai-prompt-file org-context.txt report.json
 
 This is especially useful when Bitbucket project codes or repo naming conventions aren't self-explanatory — the AI will use your descriptions to assign human-readable names and provide more insightful analysis.
 
+### Repository health classification
+
+Classify repositories as Active, Maintained, or Abandoned based on last commit date:
+
+```bash
+# Quick health check (1 API call per repo, no cloning)
+codemium analyze --provider github --org myorg --health
+
+# Deep health analysis with author counts, churn, and velocity per window
+codemium analyze --provider github --org myorg --health-details
+
+# Limit commits scanned for deep analysis (default: 500)
+codemium analyze --provider github --org myorg --health-details --health-commit-limit 200
+```
+
+Health categories:
+- **Active**: last commit < 180 days ago
+- **Maintained**: 180–365 days ago
+- **Abandoned**: > 365 days ago
+
 ### Additional flags
 
 ```bash
---concurrency 10       # Parallel workers (default: 5)
---include-archived     # Include archived repos (excluded by default)
---include-forks        # Include forked repos (excluded by default)
---ai-estimate          # Estimate AI-generated code via commit history analysis
---ai-commit-limit 200  # Max commits to scan per repo (default: 200)
+--concurrency 10            # Parallel workers (default: 5)
+--include-archived          # Include archived repos (excluded by default)
+--include-forks             # Include forked repos (excluded by default)
+--ai-estimate               # Estimate AI-generated code via commit history analysis
+--ai-commit-limit 200       # Max commits to scan per repo (default: 200)
+--health                    # Classify repos by activity level
+--health-details            # Deep health analysis (implies --health)
+--health-commit-limit 500   # Max commits for health details (default: 500)
 ```
 
 ## Output Format

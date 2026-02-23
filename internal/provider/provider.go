@@ -3,6 +3,7 @@ package provider
 
 import (
 	"context"
+	"time"
 
 	"github.com/dsablic/codemium/internal/model"
 )
@@ -30,6 +31,7 @@ type CommitInfo struct {
 	Hash    string
 	Author  string
 	Message string
+	Date    time.Time
 }
 
 // CommitLister extends Provider with commit history capabilities.

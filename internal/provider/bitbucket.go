@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/dsablic/codemium/internal/model"
 )
@@ -245,6 +246,7 @@ func workspaceSlug(repoURL string) (string, string) {
 
 type bitbucketCommit struct {
 	Hash    string `json:"hash"`
+	Date    string `json:"date"`
 	Message string `json:"message"`
 	Author  struct {
 		Raw string `json:"raw"`
@@ -284,10 +286,12 @@ func (b *Bitbucket) ListCommits(ctx context.Context, repo model.Repo, limit int)
 		resp.Body.Close()
 
 		for _, c := range page.Values {
+			commitDate, _ := time.Parse(time.RFC3339Nano, c.Date)
 			all = append(all, CommitInfo{
 				Hash:    c.Hash,
 				Author:  c.Author.Raw,
 				Message: c.Message,
+				Date:    commitDate,
 			})
 			if limit > 0 && len(all) >= limit {
 				return all, nil
