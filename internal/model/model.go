@@ -28,24 +28,26 @@ type LanguageStats struct {
 
 // Stats holds aggregate code statistics.
 type Stats struct {
-	Repos      int   `json:"repos,omitempty"`
-	Files      int64 `json:"files"`
-	Lines      int64 `json:"lines"`
-	Code       int64 `json:"code"`
-	Comments   int64 `json:"comments"`
-	Blanks     int64 `json:"blanks"`
-	Complexity int64 `json:"complexity"`
+	Repos         int   `json:"repos,omitempty"`
+	Files         int64 `json:"files"`
+	Lines         int64 `json:"lines"`
+	Code          int64 `json:"code"`
+	Comments      int64 `json:"comments"`
+	Blanks        int64 `json:"blanks"`
+	Complexity    int64 `json:"complexity"`
+	FilteredFiles int64 `json:"filtered_files,omitempty"`
 }
 
 // RepoStats holds the analysis results for a single repository.
 type RepoStats struct {
-	Repository string          `json:"repository"`
-	Project    string          `json:"project,omitempty"`
-	Provider   string          `json:"provider"`
-	URL        string          `json:"url"`
-	Languages  []LanguageStats `json:"languages"`
-	Totals     Stats           `json:"totals"`
-	AIEstimate *AIEstimate     `json:"ai_estimate,omitempty"`
+	Repository    string          `json:"repository"`
+	Project       string          `json:"project,omitempty"`
+	Provider      string          `json:"provider"`
+	URL           string          `json:"url"`
+	Languages     []LanguageStats `json:"languages"`
+	Totals        Stats           `json:"totals"`
+	FilteredFiles int64           `json:"filtered_files,omitempty"`
+	AIEstimate    *AIEstimate     `json:"ai_estimate,omitempty"`
 }
 
 // RepoError records a repository that failed to process.
