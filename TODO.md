@@ -9,6 +9,7 @@ Potential off-the-shelf Go libraries to integrate into codemium, ordered by valu
 - **What:** `IsVendor()`, `IsGenerated()`, `IsBinary()` — filter out non-human code from stats
 - **Why:** Immediately improves accuracy of existing LOC/complexity metrics across all languages. No new report section needed, just cleaner numbers.
 - **Effort:** Small — call before/during scc analysis to exclude files
+- **Status: Done** — Always-on filtering via go-enry. `FilteredFiles` count tracked per repo and in report totals.
 
 ### 2. License Detection
 - **Library:** `github.com/google/licensecheck` (Google, used by pkg.go.dev)
@@ -16,12 +17,14 @@ Potential off-the-shelf Go libraries to integrate into codemium, ordered by valu
 - **What:** Detect license per repo, report SPDX identifier
 - **Why:** License compliance is a universal concern. Every repo scan benefits from knowing the license. Language-agnostic, lightweight.
 - **Effort:** Small — scan LICENSE/COPYING files in cloned repo, add field to RepoStats
+- **Status: Done** — Implemented using `go-license-detector/v4`. SPDX license shown in per-repo License column.
 
 ### 3. Code Churn / Hotspots (no new dependency)
 - **Library:** None — build on existing `go-git`
 - **What:** Per-file change frequency, lines added/removed over time, hotspot detection (files that change most often + are most complex)
 - **Why:** Churn correlates strongly with bug density. Hotspots (high churn + high complexity) are the most actionable metric for prioritizing refactoring. Already have go-git and commit history access.
 - **Effort:** Medium — iterate commit log, accumulate per-file diffs
+- **Status: Done** — Opt-in via `--churn` flag (`--churn-limit N` for max commits, default 500). Uses provider REST APIs for per-file change data. Top 20 hotspots (churn x complexity) shown per repo.
 
 ## Tier 2 — High Value, Moderate Effort
 

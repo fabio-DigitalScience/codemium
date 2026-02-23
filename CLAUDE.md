@@ -30,6 +30,10 @@ internal/
   analyzer/
     analyzer.go        Code analysis using scc as a Go library
     clone.go           Shallow/full cloning via go-git with token auth + checkout
+  churn/
+    churn.go           Code churn analysis and hotspot computation
+  license/
+    license.go         SPDX license detection per repo
   history/
     history.go         Date generation and git commit resolution for trends
   narrative/
@@ -51,6 +55,8 @@ internal/
 
 - **scc** (`github.com/boyter/scc/v3`) - Code analysis (LOC, comments, complexity) for 200+ languages, used as a Go library
 - **go-git** (`github.com/go-git/go-git/v5`) - Pure Go git client for shallow cloning
+- **go-enry** (`github.com/go-enry/go-enry/v2`) - Vendor, generated, and binary file detection
+- **go-license-detector** (`github.com/go-enry/go-license-detector/v4`) - SPDX license detection per directory
 - **Cobra** (`github.com/spf13/cobra`) - CLI framework
 - **Bubbletea/Bubbles/Lipgloss** - Terminal UI for progress display
 
@@ -63,6 +69,9 @@ internal/
 - **Clone strategy**: Shallow clone (depth 1, single branch, no tags) to temp dir, deleted after analysis.
 - **scc initialization**: `processor.ProcessConstants()` called via `sync.Once` since scc requires global initialization.
 - **AI estimation**: When `--ai-estimate` is used, a second pass fetches commit history via provider REST APIs. `provider.CommitLister` interface provides `ListCommits` and `CommitStats`. `aidetect.Detect` classifies commits, `aiestimate.Estimate` orchestrates per-repo. Results attach to existing report model as optional fields.
+- **Vendor/generated filtering**: Always-on filtering using `go-enry` to skip vendor, generated, and binary files during analysis. `FilteredFiles` count is tracked per repo and in report totals.
+- **License detection**: After analysis, `license.Detect` scans the cloned repo directory for SPDX license identifiers (e.g., "MIT", "Apache-2.0"). Results appear in the per-repo License column.
+- **Code churn / hotspots**: Opt-in via `--churn` flag. Uses provider REST APIs to fetch per-file change data (`--churn-limit N` sets max commits, default 500). `churn.Analyze` collects per-file change frequencies; `churn.ComputeHotspots` ranks files by churn x complexity. Top 20 hotspots shown per repo.
 
 ## Conventions
 
