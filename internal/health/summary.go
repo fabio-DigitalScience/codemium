@@ -17,18 +17,23 @@ func Summarize(repos []model.RepoStats) *model.HealthSummary {
 			continue
 		}
 		hasHealth = true
-		totalCode += r.Totals.Code
 
 		switch r.Health.Category {
 		case model.HealthActive:
 			summary.Active.Repos++
 			summary.Active.Code += r.Totals.Code
+			totalCode += r.Totals.Code
 		case model.HealthMaintained:
 			summary.Maintained.Repos++
 			summary.Maintained.Code += r.Totals.Code
+			totalCode += r.Totals.Code
 		case model.HealthAbandoned:
 			summary.Abandoned.Repos++
 			summary.Abandoned.Code += r.Totals.Code
+			totalCode += r.Totals.Code
+		case model.HealthFailed:
+			summary.Failed.Repos++
+			summary.Failed.Code += r.Totals.Code
 		}
 	}
 

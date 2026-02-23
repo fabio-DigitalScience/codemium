@@ -69,6 +69,10 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 			report.HealthSummary.Maintained.Repos, report.HealthSummary.Maintained.Code, report.HealthSummary.Maintained.CodePercent)
 		fmt.Fprintf(w, "| Abandoned (>365d) | %d | %d | %.1f%% |\n",
 			report.HealthSummary.Abandoned.Repos, report.HealthSummary.Abandoned.Code, report.HealthSummary.Abandoned.CodePercent)
+		if report.HealthSummary.Failed.Repos > 0 {
+			fmt.Fprintf(w, "| Failed (error) | %d | %d | — |\n",
+				report.HealthSummary.Failed.Repos, report.HealthSummary.Failed.Code)
+		}
 		fmt.Fprintln(w)
 	}
 
@@ -111,7 +115,14 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 		if hasHealth {
 			healthStr := "\u2014"
 			if repo.Health != nil {
-				healthStr = fmt.Sprintf("%s (%dd)", capitalize(string(repo.Health.Category)), repo.Health.DaysSinceCommit)
+				switch {
+				case repo.Health.Category == model.HealthFailed:
+					healthStr = "Failed (error)"
+				case repo.Health.DaysSinceCommit >= 0:
+					healthStr = fmt.Sprintf("%s (%dd)", capitalize(string(repo.Health.Category)), repo.Health.DaysSinceCommit)
+				default:
+					healthStr = fmt.Sprintf("%s (no commits)", capitalize(string(repo.Health.Category)))
+				}
 			}
 			fmt.Fprintf(w, " | %s", healthStr)
 		}

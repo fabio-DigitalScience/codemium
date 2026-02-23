@@ -42,8 +42,14 @@ func TestClassifyBoundaries(t *testing.T) {
 func TestClassifyFromCommitsEmpty(t *testing.T) {
 	now := time.Date(2026, 2, 23, 0, 0, 0, 0, time.UTC)
 	result := ClassifyFromCommits(nil, now)
-	if result != nil {
-		t.Error("expected nil for empty commits")
+	if result == nil {
+		t.Fatal("expected non-nil result for empty commits")
+	}
+	if result.Category != model.HealthAbandoned {
+		t.Errorf("expected abandoned for empty commits, got %s", result.Category)
+	}
+	if result.DaysSinceCommit != -1 {
+		t.Errorf("expected -1 days for empty commits, got %d", result.DaysSinceCommit)
 	}
 }
 
@@ -107,6 +113,38 @@ func TestSummarizeMixed(t *testing.T) {
 	}
 }
 
+func TestSummarizeWithFailed(t *testing.T) {
+	repos := []model.RepoStats{
+		{
+			Repository: "active-repo",
+			Totals:     model.Stats{Code: 1000},
+			Health:     &model.RepoHealth{Category: model.HealthActive},
+		},
+		{
+			Repository: "failed-repo",
+			Totals:     model.Stats{Code: 500},
+			Health:     &model.RepoHealth{Category: model.HealthFailed, DaysSinceCommit: -1},
+		},
+	}
+
+	summary := Summarize(repos)
+	if summary == nil {
+		t.Fatal("expected non-nil summary")
+	}
+	if summary.Active.Repos != 1 {
+		t.Errorf("expected 1 active repo, got %d", summary.Active.Repos)
+	}
+	if summary.Failed.Repos != 1 {
+		t.Errorf("expected 1 failed repo, got %d", summary.Failed.Repos)
+	}
+	if summary.Failed.Code != 500 {
+		t.Errorf("expected 500 failed code, got %d", summary.Failed.Code)
+	}
+	if summary.Active.CodePercent != 100.0 {
+		t.Errorf("expected 100%% active code (failed excluded from total), got %.1f%%", summary.Active.CodePercent)
+	}
+}
+
 func TestSummarizeNoHealth(t *testing.T) {
 	repos := []model.RepoStats{
 		{Repository: "repo-1", Totals: model.Stats{Code: 1000}},
@@ -119,9 +157,9 @@ func TestSummarizeNoHealth(t *testing.T) {
 
 // mockCommitLister implements provider.CommitLister for testing.
 type mockCommitLister struct {
-	commits     []provider.CommitInfo
-	statsMap    map[string][2]int64 // hash -> [additions, deletions]
-	statsErr    error
+	commits  []provider.CommitInfo
+	statsMap map[string][2]int64 // hash -> [additions, deletions]
+	statsErr error
 }
 
 func (m *mockCommitLister) ListCommits(_ context.Context, _ model.Repo, _ int) ([]provider.CommitInfo, error) {

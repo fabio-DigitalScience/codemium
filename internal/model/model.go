@@ -114,6 +114,7 @@ const (
 	HealthActive     HealthCategory = "active"
 	HealthMaintained HealthCategory = "maintained"
 	HealthAbandoned  HealthCategory = "abandoned"
+	HealthFailed     HealthCategory = "failed"
 )
 
 // RepoHealth holds the health classification for a repository.
@@ -151,6 +152,7 @@ type HealthSummary struct {
 	Active     HealthCategorySummary `json:"active"`
 	Maintained HealthCategorySummary `json:"maintained"`
 	Abandoned  HealthCategorySummary `json:"abandoned"`
+	Failed     HealthCategorySummary `json:"failed"`
 }
 
 // Filters records what filters were applied to the analysis.

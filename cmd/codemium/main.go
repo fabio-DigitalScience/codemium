@@ -548,7 +548,14 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		healthResults := worker.RunWithProgress(ctx, repoList, concurrency, func(ctx context.Context, repo model.Repo) (*model.RepoStats, error) {
 			commits, err := commitLister.ListCommits(ctx, repo, commitLimit)
 			if err != nil {
-				return nil, err
+				// If we can't fetch commits, mark as failed rather than skipping
+				return &model.RepoStats{
+					Repository: repo.Slug,
+					Health: &model.RepoHealth{
+						Category:        model.HealthFailed,
+						DaysSinceCommit: -1,
+					},
+				}, nil
 			}
 
 			h := health.ClassifyFromCommits(commits, now)
@@ -557,7 +564,11 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 			if healthDetailsFlag && len(commits) > 0 {
 				details, err = health.AnalyzeDetails(ctx, commitLister, repo, commits, now)
 				if err != nil {
-					return nil, err
+					// Return health without details if details fail
+					return &model.RepoStats{
+						Repository: repo.Slug,
+						Health:     h,
+					}, nil
 				}
 			}
 
