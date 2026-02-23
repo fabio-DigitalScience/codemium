@@ -31,7 +31,11 @@ func WriteMarkdown(w io.Writer, report model.Report) error {
 	fmt.Fprintf(w, "| Code | %d |\n", report.Totals.Code)
 	fmt.Fprintf(w, "| Comments | %d |\n", report.Totals.Comments)
 	fmt.Fprintf(w, "| Blanks | %d |\n", report.Totals.Blanks)
-	fmt.Fprintf(w, "| Complexity | %d |\n\n", report.Totals.Complexity)
+	fmt.Fprintf(w, "| Complexity | %d |\n", report.Totals.Complexity)
+	if report.Totals.FilteredFiles > 0 {
+		fmt.Fprintf(w, "| Filtered Files | %d |\n", report.Totals.FilteredFiles)
+	}
+	fmt.Fprintln(w)
 
 	// AI Code Estimation (only if present)
 	if report.AIEstimate != nil {
