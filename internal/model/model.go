@@ -48,6 +48,7 @@ type RepoStats struct {
 	Languages     []LanguageStats `json:"languages"`
 	Totals        Stats           `json:"totals"`
 	FilteredFiles int64           `json:"filtered_files,omitempty"`
+	Churn         *ChurnStats     `json:"churn,omitempty"`
 	AIEstimate    *AIEstimate     `json:"ai_estimate,omitempty"`
 }
 
@@ -55,6 +56,23 @@ type RepoStats struct {
 type RepoError struct {
 	Repository string `json:"repository"`
 	Error      string `json:"error"`
+}
+
+// FileChurn holds churn metrics for a single file.
+type FileChurn struct {
+	Path       string  `json:"path"`
+	Changes    int64   `json:"changes"`
+	Additions  int64   `json:"additions"`
+	Deletions  int64   `json:"deletions"`
+	Complexity int64   `json:"complexity,omitempty"`
+	Hotspot    float64 `json:"hotspot,omitempty"`
+}
+
+// ChurnStats holds code churn and hotspot data for a repository.
+type ChurnStats struct {
+	TotalCommits int64       `json:"total_commits"`
+	TopFiles     []FileChurn `json:"top_files"`
+	Hotspots     []FileChurn `json:"hotspots,omitempty"`
 }
 
 // AISignal represents why a commit was flagged as AI-authored.
