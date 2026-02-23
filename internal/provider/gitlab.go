@@ -99,7 +99,7 @@ func (g *GitLab) doGet(ctx context.Context, reqURL string) (*http.Response, erro
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("PRIVATE-TOKEN", g.token)
+	req.Header.Set("Authorization", "Bearer "+g.token)
 	return g.client.Do(req)
 }
 

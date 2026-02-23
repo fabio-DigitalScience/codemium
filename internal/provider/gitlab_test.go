@@ -153,8 +153,8 @@ func TestGitLabExcludeSlugFilter(t *testing.T) {
 
 func TestGitLabAuthHeader(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("PRIVATE-TOKEN"); got != "my-pat" {
-			t.Errorf("expected PRIVATE-TOKEN header my-pat, got %q", got)
+		if got := r.Header.Get("Authorization"); got != "Bearer my-pat" {
+			t.Errorf("expected Authorization header 'Bearer my-pat', got %q", got)
 		}
 		json.NewEncoder(w).Encode([]map[string]any{})
 	}))
