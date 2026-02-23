@@ -2,6 +2,8 @@ package health
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,8 +44,14 @@ func TestClassifyBoundaries(t *testing.T) {
 func TestClassifyFromCommitsEmpty(t *testing.T) {
 	now := time.Date(2026, 2, 23, 0, 0, 0, 0, time.UTC)
 	result := ClassifyFromCommits(nil, now)
-	if result != nil {
-		t.Error("expected nil for empty commits")
+	if result == nil {
+		t.Fatal("expected non-nil result for empty commits")
+	}
+	if result.Category != model.HealthAbandoned {
+		t.Errorf("expected abandoned for empty commits, got %s", result.Category)
+	}
+	if result.DaysSinceCommit != -1 {
+		t.Errorf("expected -1 days for empty commits, got %d", result.DaysSinceCommit)
 	}
 }
 
@@ -107,6 +115,38 @@ func TestSummarizeMixed(t *testing.T) {
 	}
 }
 
+func TestSummarizeWithFailed(t *testing.T) {
+	repos := []model.RepoStats{
+		{
+			Repository: "active-repo",
+			Totals:     model.Stats{Code: 1000},
+			Health:     &model.RepoHealth{Category: model.HealthActive},
+		},
+		{
+			Repository: "failed-repo",
+			Totals:     model.Stats{Code: 500},
+			Health:     &model.RepoHealth{Category: model.HealthFailed, DaysSinceCommit: -1},
+		},
+	}
+
+	summary := Summarize(repos)
+	if summary == nil {
+		t.Fatal("expected non-nil summary")
+	}
+	if summary.Active.Repos != 1 {
+		t.Errorf("expected 1 active repo, got %d", summary.Active.Repos)
+	}
+	if summary.Failed.Repos != 1 {
+		t.Errorf("expected 1 failed repo, got %d", summary.Failed.Repos)
+	}
+	if summary.Failed.Code != 500 {
+		t.Errorf("expected 500 failed code, got %d", summary.Failed.Code)
+	}
+	if summary.Active.CodePercent != 100.0 {
+		t.Errorf("expected 100%% active code (failed excluded from total), got %.1f%%", summary.Active.CodePercent)
+	}
+}
+
 func TestSummarizeNoHealth(t *testing.T) {
 	repos := []model.RepoStats{
 		{Repository: "repo-1", Totals: model.Stats{Code: 1000}},
@@ -119,9 +159,9 @@ func TestSummarizeNoHealth(t *testing.T) {
 
 // mockCommitLister implements provider.CommitLister for testing.
 type mockCommitLister struct {
-	commits     []provider.CommitInfo
-	statsMap    map[string][2]int64 // hash -> [additions, deletions]
-	statsErr    error
+	commits  []provider.CommitInfo
+	statsMap map[string][2]int64 // hash -> [additions, deletions]
+	statsErr error
 }
 
 func (m *mockCommitLister) ListCommits(_ context.Context, _ model.Repo, _ int) ([]provider.CommitInfo, error) {
@@ -158,9 +198,12 @@ func TestAnalyzeDetails(t *testing.T) {
 	}
 
 	repo := model.Repo{Slug: "test-repo", URL: "https://github.com/org/test-repo"}
-	details, err := AnalyzeDetails(context.Background(), lister, repo, commits, now)
+	details, partialErrs, err := AnalyzeDetails(context.Background(), lister, repo, commits, now)
 	if err != nil {
 		t.Fatalf("AnalyzeDetails: %v", err)
+	}
+	if len(partialErrs) > 0 {
+		t.Errorf("unexpected partial errors: %v", partialErrs)
 	}
 
 	// 0-6mo: Alice, Bob (2 authors, 2 commits)
@@ -207,7 +250,7 @@ func TestAnalyzeDetailsEmpty(t *testing.T) {
 	lister := &mockCommitLister{}
 	repo := model.Repo{Slug: "empty-repo"}
 
-	details, err := AnalyzeDetails(context.Background(), lister, repo, nil, now)
+	details, _, err := AnalyzeDetails(context.Background(), lister, repo, nil, now)
 	if err != nil {
 		t.Fatalf("AnalyzeDetails: %v", err)
 	}
@@ -216,5 +259,35 @@ func TestAnalyzeDetailsEmpty(t *testing.T) {
 	}
 	if len(details.AuthorsByWindow) != 0 {
 		t.Errorf("expected empty authors, got %v", details.AuthorsByWindow)
+	}
+}
+
+func TestAnalyzeDetailsPartialErrors(t *testing.T) {
+	now := time.Date(2026, 2, 23, 0, 0, 0, 0, time.UTC)
+	commits := []provider.CommitInfo{
+		{Hash: "a1", Author: "Alice <alice@example.com>", Date: now.AddDate(0, -1, 0)},
+	}
+
+	lister := &mockCommitLister{
+		commits:  commits,
+		statsErr: fmt.Errorf("gitlab commit detail API returned status 403"),
+	}
+
+	repo := model.Repo{Slug: "test-repo", URL: "https://github.com/org/test-repo"}
+	details, partialErrs, err := AnalyzeDetails(context.Background(), lister, repo, commits, now)
+	if err != nil {
+		t.Fatalf("AnalyzeDetails: %v", err)
+	}
+	if details == nil {
+		t.Fatal("expected non-nil details")
+	}
+	if len(partialErrs) != 1 {
+		t.Fatalf("expected 1 partial error, got %d", len(partialErrs))
+	}
+	if !strings.Contains(partialErrs[0], "CommitStats a1") {
+		t.Errorf("expected partial error to reference hash a1, got %q", partialErrs[0])
+	}
+	if !strings.Contains(partialErrs[0], "403") {
+		t.Errorf("expected partial error to contain status code, got %q", partialErrs[0])
 	}
 }

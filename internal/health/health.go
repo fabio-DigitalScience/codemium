@@ -37,11 +37,13 @@ func Classify(lastCommitDate, now time.Time) *model.RepoHealth {
 	}
 }
 
-// ClassifyFromCommits classifies a repo based on a list of commits.
-// It finds the most recent commit date. Returns nil if commits is empty.
 func ClassifyFromCommits(commits []provider.CommitInfo, now time.Time) *model.RepoHealth {
 	if len(commits) == 0 {
-		return nil
+		return &model.RepoHealth{
+			Category:        model.HealthAbandoned,
+			LastCommitDate:  "",
+			DaysSinceCommit: -1,
+		}
 	}
 
 	latest := commits[0].Date
@@ -52,7 +54,11 @@ func ClassifyFromCommits(commits []provider.CommitInfo, now time.Time) *model.Re
 	}
 
 	if latest.IsZero() {
-		return nil
+		return &model.RepoHealth{
+			Category:        model.HealthAbandoned,
+			LastCommitDate:  "",
+			DaysSinceCommit: -1,
+		}
 	}
 
 	return Classify(latest, now)

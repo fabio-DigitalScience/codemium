@@ -111,12 +111,6 @@ export CODEMIUM_GITHUB_TOKEN=your_personal_access_token
    ```
    This prompts for your token, verifies it against the GitLab API, and stores it at `~/.config/codemium/credentials.json`.
 
-For self-hosted GitLab instances, set `CODEMIUM_GITLAB_URL`:
-```bash
-export CODEMIUM_GITLAB_URL=https://gitlab.example.com
-codemium auth login --provider gitlab
-```
-
 **Option 2: glab CLI**
 
 If you have the [GitLab CLI](https://gitlab.com/gitlab-org/cli) installed and authenticated, codemium can use its token automatically:
@@ -183,9 +177,6 @@ codemium analyze --provider gitlab --group myorg/mysubgroup
 
 # Specific repos
 codemium analyze --provider gitlab --group mygroup --repos api,frontend
-
-# Self-hosted GitLab
-CODEMIUM_GITLAB_URL=https://gitlab.example.com codemium analyze --provider gitlab --group mygroup
 ```
 
 ### Analyze trends over time
@@ -267,7 +258,7 @@ This is especially useful when Bitbucket project codes or repo naming convention
 
 ### Repository health classification
 
-Classify repositories as Active, Maintained, or Abandoned based on last commit date:
+Classify repositories as Active, Maintained, Abandoned, or Failed based on commit history:
 
 ```bash
 # Quick health check (1 API call per repo, no cloning)
@@ -284,6 +275,9 @@ Health categories:
 - **Active**: last commit < 180 days ago
 - **Maintained**: 180–365 days ago
 - **Abandoned**: > 365 days ago
+- **Failed**: commit history could not be fetched (API error, permissions, etc.)
+
+When API errors occur during health classification, AI estimation, or detailed analysis, an error log is automatically written next to the JSON report (e.g., `output/report.error.log` for `output/report.json`). Each line is prefixed with a category (`[health]`, `[health-details]`, `[ai-estimate]`, `[ai-estimate-detail]`) for easy filtering with `grep`.
 
 ### Additional flags
 

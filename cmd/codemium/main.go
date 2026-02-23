@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -20,11 +21,11 @@ import (
 
 	"github.com/dsablic/codemium/internal/aiestimate"
 	"github.com/dsablic/codemium/internal/analyzer"
-	"github.com/dsablic/codemium/internal/churn"
-	"github.com/dsablic/codemium/internal/license"
 	"github.com/dsablic/codemium/internal/auth"
+	"github.com/dsablic/codemium/internal/churn"
 	"github.com/dsablic/codemium/internal/health"
 	"github.com/dsablic/codemium/internal/history"
+	"github.com/dsablic/codemium/internal/license"
 	"github.com/dsablic/codemium/internal/model"
 	"github.com/dsablic/codemium/internal/narrative"
 	"github.com/dsablic/codemium/internal/output"
@@ -38,6 +39,13 @@ var (
 	commit  = "none"
 	date    = "unknown"
 )
+
+// errorEntry represents a diagnostic error for the error log.
+type errorEntry struct {
+	Category string
+	Repo     string
+	Message  string
+}
 
 func main() {
 	root := &cobra.Command{
@@ -441,6 +449,10 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		program = nil
 	}
 
+	// Diagnostic error collection (written to error.log if non-empty)
+	var diagErrors []errorEntry
+	var diagMu sync.Mutex
+
 	// AI estimation phase
 	aiEstimateFlag, _ := cmd.Flags().GetBool("ai-estimate")
 	aiCommitLimit, _ := cmd.Flags().GetInt("ai-commit-limit")
@@ -471,7 +483,14 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		}
 
 		aiResults := worker.RunWithProgress(ctx, repoList, concurrency, func(ctx context.Context, repo model.Repo) (*model.RepoStats, error) {
-			est, err := aiestimate.Estimate(ctx, commitLister, repo, aiCommitLimit)
+			est, partialErrs, err := aiestimate.Estimate(ctx, commitLister, repo, aiCommitLimit)
+			if len(partialErrs) > 0 {
+				diagMu.Lock()
+				for _, pe := range partialErrs {
+					diagErrors = append(diagErrors, errorEntry{Category: "ai-estimate-detail", Repo: repo.Slug, Message: pe})
+				}
+				diagMu.Unlock()
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -491,7 +510,11 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		// Attach AI estimates to analysis results
 		aiByRepo := make(map[string]*model.AIEstimate)
 		for _, r := range aiResults {
-			if r.Err == nil && r.Stats != nil && r.Stats.AIEstimate != nil {
+			if r.Err != nil {
+				diagErrors = append(diagErrors, errorEntry{Category: "ai-estimate", Repo: r.Repo.Slug, Message: r.Err.Error()})
+				continue
+			}
+			if r.Stats != nil && r.Stats.AIEstimate != nil {
 				aiByRepo[r.Repo.Slug] = r.Stats.AIEstimate
 			}
 		}
@@ -548,16 +571,40 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		healthResults := worker.RunWithProgress(ctx, repoList, concurrency, func(ctx context.Context, repo model.Repo) (*model.RepoStats, error) {
 			commits, err := commitLister.ListCommits(ctx, repo, commitLimit)
 			if err != nil {
-				return nil, err
+				diagMu.Lock()
+				diagErrors = append(diagErrors, errorEntry{Category: "health", Repo: repo.Slug, Message: err.Error()})
+				diagMu.Unlock()
+				return &model.RepoStats{
+					Repository: repo.Slug,
+					Health: &model.RepoHealth{
+						Category:        model.HealthFailed,
+						DaysSinceCommit: -1,
+						Error:           err.Error(),
+					},
+				}, nil
 			}
 
 			h := health.ClassifyFromCommits(commits, now)
 
 			var details *model.RepoHealthDetails
 			if healthDetailsFlag && len(commits) > 0 {
-				details, err = health.AnalyzeDetails(ctx, commitLister, repo, commits, now)
+				var partialErrs []string
+				details, partialErrs, err = health.AnalyzeDetails(ctx, commitLister, repo, commits, now)
+				if len(partialErrs) > 0 {
+					diagMu.Lock()
+					for _, pe := range partialErrs {
+						diagErrors = append(diagErrors, errorEntry{Category: "health-details", Repo: repo.Slug, Message: pe})
+					}
+					diagMu.Unlock()
+				}
 				if err != nil {
-					return nil, err
+					diagMu.Lock()
+					diagErrors = append(diagErrors, errorEntry{Category: "health-details", Repo: repo.Slug, Message: err.Error()})
+					diagMu.Unlock()
+					return &model.RepoStats{
+						Repository: repo.Slug,
+						Health:     h,
+					}, nil
 				}
 			}
 
@@ -646,6 +693,24 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 				}
 			}
 		}
+	}
+
+	// Write error.log if there were any diagnostic errors
+	if len(diagErrors) > 0 {
+		ext := filepath.Ext(outputPath)
+		errorLogPath := strings.TrimSuffix(outputPath, ext) + ".error.log"
+		if err := os.MkdirAll(filepath.Dir(errorLogPath), 0o755); err != nil {
+			return fmt.Errorf("create error log directory: %w", err)
+		}
+		f, err := os.Create(errorLogPath)
+		if err != nil {
+			return fmt.Errorf("create error log: %w", err)
+		}
+		for _, e := range diagErrors {
+			fmt.Fprintf(f, "[%s] %s | %s\n", e.Category, e.Repo, e.Message)
+		}
+		f.Close()
+		fmt.Fprintf(os.Stderr, "Error log written to %s (%d entries)\n", errorLogPath, len(diagErrors))
 	}
 
 	// Build report — use user/group as organization in metadata when set

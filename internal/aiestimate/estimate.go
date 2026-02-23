@@ -2,6 +2,7 @@ package aiestimate
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/dsablic/codemium/internal/aidetect"
@@ -12,10 +13,11 @@ import (
 const statsConcurrency = 10
 
 // Estimate computes AI attribution metrics for a single repo.
-func Estimate(ctx context.Context, cl provider.CommitLister, repo model.Repo, commitLimit int) (*model.AIEstimate, error) {
+// It returns the estimate, a list of partial error messages (per-commit stat failures), and a fatal error.
+func Estimate(ctx context.Context, cl provider.CommitLister, repo model.Repo, commitLimit int) (*model.AIEstimate, []string, error) {
 	commits, err := cl.ListCommits(ctx, repo, commitLimit)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	est := &model.AIEstimate{
@@ -68,10 +70,12 @@ func Estimate(ctx context.Context, cl provider.CommitLister, repo model.Repo, co
 	}
 	wg.Wait()
 
+	var partialErrors []string
 	for i, fc := range flagged {
 		d := details[i]
 		if d.err != nil {
-			continue // partial failure — skip this commit's stats
+			partialErrors = append(partialErrors, fmt.Sprintf("CommitStats %s: %v", fc.info.Hash, d.err))
+			continue
 		}
 
 		est.AIAdditions += d.additions
@@ -95,5 +99,5 @@ func Estimate(ctx context.Context, cl provider.CommitLister, repo model.Repo, co
 		})
 	}
 
-	return est, nil
+	return est, partialErrors, nil
 }
