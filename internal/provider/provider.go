@@ -37,3 +37,16 @@ type CommitLister interface {
 	ListCommits(ctx context.Context, repo model.Repo, limit int) ([]CommitInfo, error)
 	CommitStats(ctx context.Context, repo model.Repo, hash string) (additions, deletions int64, err error)
 }
+
+// FileChange represents a file modified in a commit.
+type FileChange struct {
+	Path      string
+	Additions int64
+	Deletions int64
+}
+
+// ChurnLister extends Provider with per-file commit stats.
+type ChurnLister interface {
+	CommitLister
+	CommitFileStats(ctx context.Context, repo model.Repo, hash string) ([]FileChange, error)
+}

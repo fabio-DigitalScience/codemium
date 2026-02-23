@@ -163,6 +163,12 @@ type githubCommitDetail struct {
 	} `json:"stats"`
 }
 
+type githubFileChange struct {
+	Filename  string `json:"filename"`
+	Additions int64  `json:"additions"`
+	Deletions int64  `json:"deletions"`
+}
+
 // ListCommits fetches up to limit commits for a repo via the GitHub API.
 func (g *GitHub) ListCommits(ctx context.Context, repo model.Repo, limit int) ([]CommitInfo, error) {
 	owner, name := ownerRepo(repo.URL)
@@ -241,4 +247,43 @@ func (g *GitHub) CommitStats(ctx context.Context, repo model.Repo, hash string) 
 	}
 
 	return detail.Stats.Additions, detail.Stats.Deletions, nil
+}
+
+// CommitFileStats fetches per-file addition/deletion counts for a single commit.
+func (g *GitHub) CommitFileStats(ctx context.Context, repo model.Repo, hash string) ([]FileChange, error) {
+	owner, name := ownerRepo(repo.URL)
+	if owner == "" {
+		return nil, fmt.Errorf("cannot parse owner/repo from URL: %s", repo.URL)
+	}
+
+	url := fmt.Sprintf("%s/repos/%s/%s/commits/%s", g.baseURL, owner, name, hash)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+g.token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := g.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("github commit detail API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("github commit detail API returned status %d", resp.StatusCode)
+	}
+
+	var detail struct {
+		Files []githubFileChange `json:"files"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		return nil, fmt.Errorf("decode github commit files: %w", err)
+	}
+
+	changes := make([]FileChange, len(detail.Files))
+	for i, f := range detail.Files {
+		changes[i] = FileChange{Path: f.Filename, Additions: f.Additions, Deletions: f.Deletions}
+	}
+	return changes, nil
 }
