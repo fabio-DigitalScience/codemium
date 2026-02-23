@@ -94,6 +94,12 @@ func (s *FileStore) LoadWithEnv(provider string) (Credentials, error) {
 			return Credentials{AccessToken: token}, nil
 		}
 	}
+	// For GitLab, try the glab CLI as a last fallback
+	if provider == "gitlab" {
+		if token, ok := GlabCLIToken(); ok {
+			return Credentials{AccessToken: token}, nil
+		}
+	}
 	return Credentials{}, ErrNoCredentials
 }
 

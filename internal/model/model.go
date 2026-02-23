@@ -39,13 +39,15 @@ type Stats struct {
 
 // RepoStats holds the analysis results for a single repository.
 type RepoStats struct {
-	Repository string          `json:"repository"`
-	Project    string          `json:"project,omitempty"`
-	Provider   string          `json:"provider"`
-	URL        string          `json:"url"`
-	Languages  []LanguageStats `json:"languages"`
-	Totals     Stats           `json:"totals"`
-	AIEstimate *AIEstimate     `json:"ai_estimate,omitempty"`
+	Repository    string             `json:"repository"`
+	Project       string             `json:"project,omitempty"`
+	Provider      string             `json:"provider"`
+	URL           string             `json:"url"`
+	Languages     []LanguageStats    `json:"languages"`
+	Totals        Stats              `json:"totals"`
+	AIEstimate    *AIEstimate        `json:"ai_estimate,omitempty"`
+	Health        *RepoHealth        `json:"health,omitempty"`
+	HealthDetails *RepoHealthDetails `json:"health_details,omitempty"`
 }
 
 // RepoError records a repository that failed to process.
@@ -84,6 +86,52 @@ type AIEstimate struct {
 	Details         []AICommit `json:"details,omitempty"`
 }
 
+// HealthCategory classifies a repository's activity level.
+type HealthCategory string
+
+const (
+	HealthActive     HealthCategory = "active"
+	HealthMaintained HealthCategory = "maintained"
+	HealthAbandoned  HealthCategory = "abandoned"
+)
+
+// RepoHealth holds the health classification for a repository.
+type RepoHealth struct {
+	Category        HealthCategory `json:"category"`
+	LastCommitDate  string         `json:"last_commit_date"`
+	DaysSinceCommit int            `json:"days_since_commit"`
+}
+
+// RepoHealthDetails holds deep health analysis for a repository.
+type RepoHealthDetails struct {
+	AuthorsByWindow map[string]int        `json:"authors_by_window,omitempty"`
+	ChurnByWindow   map[string]ChurnStats `json:"churn_by_window,omitempty"`
+	BusFactor       float64               `json:"bus_factor"`
+	VelocityTrend   float64               `json:"velocity_trend"`
+}
+
+// ChurnStats holds code churn metrics for a time window.
+type ChurnStats struct {
+	Additions int64 `json:"additions"`
+	Deletions int64 `json:"deletions"`
+	NetChurn  int64 `json:"net_churn"`
+	Commits   int   `json:"commits"`
+}
+
+// HealthCategorySummary aggregates repos and code for a health category.
+type HealthCategorySummary struct {
+	Repos       int     `json:"repos"`
+	Code        int64   `json:"code"`
+	CodePercent float64 `json:"code_percent"`
+}
+
+// HealthSummary holds aggregate health data across all repos.
+type HealthSummary struct {
+	Active     HealthCategorySummary `json:"active"`
+	Maintained HealthCategorySummary `json:"maintained"`
+	Abandoned  HealthCategorySummary `json:"abandoned"`
+}
+
 // Filters records what filters were applied to the analysis.
 type Filters struct {
 	Projects []string `json:"projects,omitempty"`
@@ -116,14 +164,15 @@ type TrendsReport struct {
 
 // Report is the top-level output structure.
 type Report struct {
-	GeneratedAt  string          `json:"generated_at"`
-	Provider     string          `json:"provider"`
-	Workspace    string          `json:"workspace,omitempty"`
-	Organization string          `json:"organization,omitempty"`
-	Filters      Filters         `json:"filters"`
-	Repositories []RepoStats     `json:"repositories"`
-	Totals       Stats           `json:"totals"`
-	ByLanguage   []LanguageStats `json:"by_language"`
-	Errors       []RepoError     `json:"errors,omitempty"`
-	AIEstimate   *AIEstimate     `json:"ai_estimate,omitempty"`
+	GeneratedAt   string          `json:"generated_at"`
+	Provider      string          `json:"provider"`
+	Workspace     string          `json:"workspace,omitempty"`
+	Organization  string          `json:"organization,omitempty"`
+	Filters       Filters         `json:"filters"`
+	Repositories  []RepoStats     `json:"repositories"`
+	Totals        Stats           `json:"totals"`
+	ByLanguage    []LanguageStats `json:"by_language"`
+	Errors        []RepoError     `json:"errors,omitempty"`
+	AIEstimate    *AIEstimate     `json:"ai_estimate,omitempty"`
+	HealthSummary *HealthSummary  `json:"health_summary,omitempty"`
 }
